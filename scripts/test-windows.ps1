@@ -1,0 +1,29 @@
+$ErrorActionPreference = 'Stop'
+$root = Split-Path $PSScriptRoot -Parent
+$payload = Join-Path $root 'build\payload'
+$evidence = Join-Path $root 'build\evidence'
+New-Item -ItemType Directory $evidence -Force | Out-Null
+function Run-App($exe, $arguments) {
+    $p = Start-Process -FilePath $exe -ArgumentList $arguments -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw "Application failed ($($p.ExitCode)): $arguments" }
+}
+$app = Join-Path $payload 'app\Zapret2Manager.exe'
+Run-App $app '--configure-package'
+Run-App $app "--self-test `"$evidence\self-test.txt`""
+Run-App $app '--ui-test'
+Copy-Item "$payload\app\tests\*" $evidence -Force
+foreach ($report in @('self-test.txt', 'ui-test.txt', 'tray-test.txt')) {
+    $text = Get-Content (Join-Path $evidence $report) -Raw
+    if ($text -match 'FAIL' -or $text -notmatch 'PASS') { throw "Failed report: $report`n$text" }
+}
+Run-App $app '--test-package-service'
+Copy-Item "$payload\package-service-test.txt" $evidence
+$target = Join-Path $env:RUNNER_TEMP 'zapret2-installer-test'
+$installer = Join-Path $root 'dist\Zapret2Manager-Setup-3.6.3-x64.exe'
+$p = Start-Process $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TESTMODE=1 /DIR=`"$target`" /LOG=`"$evidence\install.log`"" -Wait -PassThru
+if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+Run-App "$target\app\Zapret2Manager.exe" "--package-check `"$evidence\installed-check.txt`""
+$uninstaller = Get-ChildItem "$target\uninstall\unins*.exe" | Select-Object -First 1
+$p = Start-Process $uninstaller.FullName -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+if ($p.ExitCode -ne 0) { throw "Uninstaller failed: $($p.ExitCode)" }
+'PASS: isolated install, installed configuration checks and uninstall' | Set-Content "$evidence\installer-test.txt"
