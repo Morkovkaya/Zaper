@@ -16,7 +16,7 @@ ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/run/zapret2-manager
 RuntimeDirectory=zapret2-manager
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SETUID CAP_SETGID CAP_SETPCAP
 Environment=PYTHONUNBUFFERED=1
 
 [Install]

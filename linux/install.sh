@@ -15,7 +15,7 @@ fi
 case "$mode" in
  install)
     test -f "$source_dir/runtime/sha256.json" || { echo 'Download a complete release archive first' >&2; exit 1; }
-    /usr/bin/python3 -I "$source_dir/zapret_manager.py" check >/dev/null
+    /usr/bin/python3 -I "$source_dir/zapret_manager.py" verify >/dev/null
     if [ -e "$app" ] && [ ! -f "$app/.zapret2-manager-install" ]; then
         echo "$app is occupied; refusing to overwrite" >&2
         exit 1
@@ -30,8 +30,11 @@ case "$mode" in
     rm -rf "$app/runtime"
     cp -R "$source_dir/runtime" "$app/runtime"
     printf '%s\n' 'Zapret2 Manager installed by install.sh' > "$app/.zapret2-manager-install"
-    chmod -R go-w "$app"
+    find "$app" -type d -exec chmod 755 {} +
+    find "$app" -type f -exec chmod 644 {} +
+    chmod 755 "$app/runtime/bin/x86_64/nfqws2" "$app/runtime/bin/arm64/nfqws2"
     if [ -z "$stage" ]; then chown -R root:root "$app"; fi
+    /usr/bin/python3 -I "$app/zapret_manager.py" check >/dev/null
     cat > "$cli" <<'EOF'
 #!/bin/sh
 exec /usr/bin/python3 -I /opt/zapret2-manager/zapret_manager.py "$@"

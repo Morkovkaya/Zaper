@@ -95,5 +95,12 @@ if __name__ == '__main__':
     try:
         test_lifecycle(False)
         test_lifecycle(True)
+        nft('add', 'table', 'inet', manager.TABLE)
+        try:
+            refused = subprocess.run([sys.executable, str(manager.HOME / 'zapret_manager.py'), 'run'], capture_output=True, timeout=15)
+            assert refused.returncode == 1 and has_table()
+            print('PASS: foreign table collision refused without deleting it')
+        finally:
+            nft('delete', 'table', 'inet', manager.TABLE)
     finally:
         nft('delete', 'table', 'inet', 'sentinel')

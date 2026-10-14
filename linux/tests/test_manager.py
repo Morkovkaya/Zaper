@@ -40,6 +40,21 @@ class SettingsTests(unittest.TestCase):
         self.assertIn('meta skuid { 1000 }', rules)
         self.assertIn('ct mark & 0x20000000 != 0 return', rules)
 
+    def test_https_probe_classifies_content(self):
+        responses = []
+        for status, body in ((200, b'ytInitialData'), (204, b''), (200, b'{"url":"wss://gateway.discord.gg"}'), (403, b'Forbidden')):
+            response = unittest.mock.MagicMock()
+            response.__enter__.return_value = response
+            response.status = status
+            response.read.return_value = body
+            responses.append(response)
+        opener = unittest.mock.Mock()
+        opener.open.side_effect = responses
+        with patch('urllib.request.build_opener', return_value=opener):
+            result = manager.network_probes()
+        self.assertEqual([x['success'] for x in result['probes']], [True, True, True, False])
+        self.assertIn('Anti-Cheat', result['note'])
+
     def test_detect_queue_owner(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'queues'

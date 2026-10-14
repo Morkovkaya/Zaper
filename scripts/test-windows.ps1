@@ -18,7 +18,24 @@ function Run-App($exe, $arguments) {
 }
 $app = Join-Path $payload 'app\Zapret2Manager.exe'
 Run-App $app '--configure-package'
-Run-App $app "--self-test `"$evidence\self-test.txt`""
+# Keep every attempt: Cygwin initialization and the old process-enumeration
+# check can race on hosted runners. Other failures are never retried.
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    $report = "$evidence\self-test.txt"
+    try {
+        Run-App $app "--self-test `"$report`""
+        break
+    } catch {
+        if (!(Test-Path $report)) { throw }
+        Copy-Item $report "$evidence\self-test-attempt-$attempt.txt"
+        $text = Get-Content $report -Raw
+        $failLines = @($text -split "`n" | Where-Object { $_ -match '^FAIL:' })
+        $knownTransient = $failLines.Count -eq 1 -and ($failLines[0] -match 'cancelled curl process cleaned up|exit=-1073741502')
+        if (!$knownTransient -or $attempt -eq 3) { throw }
+        Write-Output "Retrying known runner race; original evidence retained (attempt $attempt)."
+        Start-Sleep -Seconds 2
+    }
+}
 New-Item -ItemType Directory "$payload\app\tests" -Force | Out-Null
 Run-App $app '--ui-test'
 Copy-Item "$payload\app\tests\*" $evidence -Force

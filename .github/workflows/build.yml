@@ -51,7 +51,9 @@ jobs:
       - name: ARM64 real engine profile checks
         run: python3 scripts/test-arm64.py dist/Zapret2Manager-3.6.3-linux.1
       - name: Isolated real packet lifecycle
-        run: sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zapret2Manager-3.6.3-linux.1/tests/integration.py'
+        run: |
+          cp -R dist/Zapret2Manager-3.6.3-linux.1 /tmp/zapret2-ci
+          sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
       - name: Staged install and uninstall
         run: |
           cd dist/Zapret2Manager-3.6.3-linux.1

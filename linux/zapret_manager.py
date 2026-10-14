@@ -333,7 +333,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Zapret 2 Manager — Linux')
     parser.add_argument('--version', action='version', version=VERSION)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name in ('check', 'show', 'diagnose', 'run', 'start', 'stop', 'restart', 'enable', 'disable', 'status', 'probe'):
+    for name in ('check', 'show', 'diagnose', 'run', 'start', 'stop', 'restart', 'enable', 'disable', 'status', 'probe', 'verify'):
         commands.add_parser(name)
     config = commands.add_parser('configure')
     config.add_argument('--game', choices=['off', 'tcp', 'udp', 'all'])
@@ -345,7 +345,10 @@ def main(argv=None):
     config.add_argument('--clear-exclusions', action='store_true')
     args = parser.parse_args(argv)
     try:
-        if args.command == 'probe':
+        if args.command == 'verify':
+            verify_runtime()
+            print('Runtime SHA256 verified')
+        elif args.command == 'probe':
             result = network_probes()
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if all(row['success'] for row in result['probes']) else 1
