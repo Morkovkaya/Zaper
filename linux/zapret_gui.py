@@ -17,8 +17,9 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title('Zapret 2 Manager — Linux 3.6.3')
-        root.geometry('850x630')
-        root.minsize(680, 540)
+        root.geometry('850x730')
+        root.minsize(680, 650)
+        self.settings_data = {}
         self.busy = False
         self.results = __import__('queue').Queue()
         self.status = tk.StringVar(value='Проверка состояния…')
@@ -55,11 +56,13 @@ class App:
         settings.columnconfigure(1, weight=1)
         ttk.Label(settings, text='Режим игр работает при IPSet loaded или any.\nИсключения доменов, IP/CIDR и UID доступны через CLI.').grid(row=3, column=0, columnspan=2, sticky='w', pady=12)
         self.button(settings, 'Сохранить и проверить', self.save).grid(row=4, column=0, columnspan=2, sticky='w')
+        self.button(settings, 'Исключения доменов / IP / UID', self.exclusions).grid(row=6, column=0, columnspan=2, sticky='w')
         auto = ttk.Frame(settings)
         auto.grid(row=5, column=0, columnspan=2, sticky='w', pady=10)
         self.button(auto, 'Включить автозапуск', lambda: self.run(['enable'], privileged=True)).pack(side='left', padx=(0, 8))
         self.button(auto, 'Отключить автозапуск', lambda: self.run(['disable'], privileged=True)).pack(side='left')
         self.button(diagnostics, 'Проверить конфигурацию', lambda: self.run(['check'])).pack(anchor='w', pady=6)
+        self.button(diagnostics, 'Проверить HTTPS-соединения', lambda: self.run(['probe'])).pack(anchor='w', pady=6)
         self.button(diagnostics, 'Проверить зависимости', lambda: self.run(['diagnose'])).pack(anchor='w', pady=6)
         ttk.Label(diagnostics, text='HTTPS и вход в матч зависят от провайдера и сервисов.\nFACEIT Anti-Cheat для Linux этим портом не предоставляется.').pack(anchor='w', pady=12)
         self.log = tk.Text(main, height=7, bg='#0c1220', fg='#cbd7f0', wrap='word', state='disabled')
@@ -74,6 +77,33 @@ class App:
 
     def save(self):
         self.run(['configure', '--game', self.game.get(), '--ipset', self.ipset.get(), '--strategy', self.strategy.get()], privileged=True)
+
+    def exclusions(self):
+        if self.busy:
+            return
+        try:
+            result = subprocess.run(['/usr/bin/python3', '-I', str(LOCAL), 'show'], capture_output=True, text=True, timeout=3, check=True)
+            self.settings_data = json.loads(result.stdout)
+        except Exception:
+            pass
+        dialog = tk.Toplevel(self.root)
+        dialog.title('Исключения Linux')
+        dialog.transient(self.root)
+        fields = {}
+        for n, (key, label) in enumerate((('domains', 'Домены через запятую'), ('ips', 'IP или CIDR через запятую'), ('uids', 'UID пользователей через запятую'))):
+            ttk.Label(dialog, text=label).grid(row=n, column=0, padx=12, pady=10, sticky='w')
+            field = tk.StringVar(value=', '.join(map(str, self.settings_data.get('excluded_' + key, []))))
+            ttk.Entry(dialog, textvariable=field, width=45).grid(row=n, column=1, padx=12)
+            fields[key] = field
+        def save():
+            args = ['configure', '--clear-exclusions']
+            for key, field in fields.items():
+                for value in field.get().split(','):
+                    if value.strip():
+                        args += ['--exclude-' + {'domains': 'domain', 'ips': 'ip', 'uids': 'uid'}[key], value.strip()]
+            self.run(args, privileged=True)
+            dialog.destroy()
+        ttk.Button(dialog, text='Проверить и сохранить', command=save).grid(row=3, column=0, columnspan=2, pady=14)
 
     def run(self, args, privileged=False, settings=False):
         if self.busy:
@@ -108,6 +138,7 @@ class App:
                 button.state(['!disabled'])
             if settings and code == 0:
                 data = json.loads(output)
+                self.settings_data = data
                 for name in ('game', 'ipset', 'strategy'):
                     getattr(self, name).set(data[name])
             else:

@@ -12,24 +12,28 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 9561c870d7f54dc2ece89b571f03b72e15eb8725
+          path: windows-source
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup --yes --no-progress
       - name: Build installer
         shell: powershell
-        run: ./build.ps1 -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+        run: ./windows-source/build.ps1 -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
       - name: Verify application and installer
         shell: powershell
-        run: ./scripts/test-windows.ps1
+        run: ./scripts/test-windows.ps1 -SourceRoot windows-source
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-evidence
-          path: build/evidence/
+          path: windows-source/build/evidence/
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: dist/*.exe
+          path: windows-source/dist/*.exe
           if-no-files-found: error
   linux:
     runs-on: ubuntu-24.04

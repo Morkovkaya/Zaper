@@ -288,6 +288,37 @@ def service(action):
     checked(['systemctl', action, SERVICE])
 
 
+def network_probes():
+    """Direct HTTPS diagnostics; never interpret an HTTP response as match access."""
+    import urllib.request
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    results = []
+    targets = (
+        ('YouTube', 'https://www.youtube.com/', 'youtube'),
+        ('YouTube API', 'https://youtubei.googleapis.com/generate_204', 'empty'),
+        ('Discord Gateway', 'https://discord.com/api/v10/gateway', 'gateway'),
+        ('FACEIT', 'https://www.faceit.com/', 'http'),
+    )
+    for name, url, kind in targets:
+        start = time.monotonic()
+        row = {'target': name, 'url': url, 'success': False, 'http': 0}
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': 'Zapret2Manager/' + VERSION})
+            with opener.open(request, timeout=6) as response:
+                row['http'] = response.status
+                body = response.read(1024 * 1024)
+                row['success'] = (response.status == 204 if kind == 'empty' else
+                    response.status == 200 and (b'ytInitial' in body or b'INNERTUBE' in body) if kind == 'youtube' else
+                    response.status == 200 and json.loads(body).get('url', '').startswith('wss://') if kind == 'gateway' else
+                    response.status == 200)
+        except Exception as exc:
+            row['http'] = getattr(exc, 'code', 0)
+            row['error'] = str(exc)
+        row['seconds'] = round(time.monotonic() - start, 3)
+        results.append(row)
+    return {'probes': results, 'note': 'HTTPS only. Discord voice, screen sharing and FACEIT match/Anti-Cheat are not verified.'}
+
+
 def diagnostics():
     result = {'version': VERSION, 'architecture': platform.machine(), 'python': platform.python_version(),
               'nft': shutil.which('nft'), 'systemd': Path('/run/systemd/system').exists(), 'queue_owner': queue_owner()}
@@ -302,7 +333,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Zapret 2 Manager — Linux')
     parser.add_argument('--version', action='version', version=VERSION)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name in ('check', 'show', 'diagnose', 'run', 'start', 'stop', 'restart', 'enable', 'disable', 'status'):
+    for name in ('check', 'show', 'diagnose', 'run', 'start', 'stop', 'restart', 'enable', 'disable', 'status', 'probe'):
         commands.add_parser(name)
     config = commands.add_parser('configure')
     config.add_argument('--game', choices=['off', 'tcp', 'udp', 'all'])
@@ -314,7 +345,11 @@ def main(argv=None):
     config.add_argument('--clear-exclusions', action='store_true')
     args = parser.parse_args(argv)
     try:
-        if args.command == 'diagnose':
+        if args.command == 'probe':
+            result = network_probes()
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if all(row['success'] for row in result['probes']) else 1
+        elif args.command == 'diagnose':
             print(json.dumps(diagnostics(), ensure_ascii=False, indent=2))
         elif args.command == 'status':
             if Path('/run/systemd/system').exists():

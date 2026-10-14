@@ -14,3 +14,6 @@
 **/native-*.json
 **/native-*.txt
 **/config.txt
+
+__pycache__/
+*.py[cod]

@@ -1,5 +1,6 @@
+param([string]$SourceRoot="")
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
+$root = if ($SourceRoot) { (Resolve-Path $SourceRoot).Path } else { Split-Path $PSScriptRoot -Parent }
 $payload = Join-Path $root 'build\payload'
 $evidence = Join-Path $root 'build\evidence'
 New-Item -ItemType Directory $evidence -Force | Out-Null
@@ -23,7 +24,7 @@ Run-App $app '--ui-test'
 Copy-Item "$payload\app\tests\*" $evidence -Force
 foreach ($report in @('self-test.txt', 'ui-test.txt', 'tray-test.txt')) {
     $text = Get-Content (Join-Path $evidence $report) -Raw
-    if ($text -match 'FAIL' -or $text -notmatch 'PASS') { throw "Failed report: $report`n$text" }
+    if ($text -match '(?m)^FAIL:' -or $text -notmatch 'PASS') { throw "Failed report: $report`n$text" }
 }
 Run-App $app '--test-package-service'
 Copy-Item "$payload\package-service-test.txt" $evidence
