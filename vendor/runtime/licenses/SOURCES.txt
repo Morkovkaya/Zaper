@@ -1,0 +1,29 @@
+Third-party components are unmodified. Their respective licenses apply.
+
+zapret2 / winws2 1.0.5.2:
+https://github.com/bol-van/zapret2
+https://github.com/bol-van/zapret-win-bundle
+https://github.com/bol-van/zapret2/tree/6b6c63e3385fa73f8af3be4a69171e947f5a319d
+
+WinDivert:
+https://github.com/basil00/WinDivert
+
+Cygwin runtime and supporting DLLs:
+https://cygwin.com/licensing.html
+https://cygwin.com/packages/
+https://cygwin.com/mirrors.html
+https://sourceware.org/git/?p=newlib-cygwin.git
+The official package mirrors provide binary and corresponding source packages.
+
+curl, OpenSSL, nghttp2, nghttp3:
+https://github.com/curl/curl
+https://github.com/openssl/openssl
+https://github.com/nghttp2/nghttp2
+https://github.com/ngtcp2/nghttp3
+
+Public domain / IP lists:
+https://github.com/Flowseal/zapret-discord-youtube
+
+The application source code is included in the app directory. Build with
+the Windows .NET Framework C# compiler, references System.Windows.Forms,
+System.Drawing, System.ServiceProcess and System.Web.Extensions.

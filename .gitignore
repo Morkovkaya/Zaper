@@ -1,0 +1,16 @@
+/build/
+/dist/
+.vs/
+*.user
+*.suo
+*.log
+.env
+.env.*
+*.pfx
+*.key
+**/manager-settings.json
+**/app-exclusions.json
+**/*-status.json
+**/native-*.json
+**/native-*.txt
+**/config.txt

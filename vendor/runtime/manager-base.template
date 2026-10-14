@@ -1,0 +1,54 @@
+--blob=discord_udp:@"%ROOT%\files\ACTIVE_DISCORD_UDP.bin"
+--wf-udp-out=19294-19344,50000-50100
+--blob=tls_max:@"%ROOT%\files\tls_clienthello_max_ru.bin"
+--blob=stun2:@"%ROOT%\files\stun2.bin"
+--wf-tcp-out=80,443,2053,2083,2087,2096,8443  
+--lua-init=@"%ROOT%\lua\zapret-lib.lua" --lua-init=@"%ROOT%\lua\zapret-antidpi.lua" 
+--lua-init="fake_default_tls = tls_mod(fake_default_tls,'rnd,rndsni')" 
+--blob=quic_google:@"%ROOT%\files\quic_initial_www_google_com.bin" 
+--wf-raw-part=@"%ROOT%\windivert.filter\windivert_part.discord_media.txt" 
+--wf-raw-part=@"%ROOT%\windivert.filter\windivert_part.stun.txt" 
+--wf-raw-part=@"%ROOT%\windivert.filter\windivert_part.quic_initial_ietf.txt" 
+--filter-tcp=80 --filter-l7=http --hostlist="%ROOT%\lists\list-general.txt" --hostlist="%ROOT%\lists\list-general-user.txt" --hostlist="%ROOT%\lists\list-google.txt" --hostlist="%ROOT%\files\list-youtube.txt" --hostlist-exclude="%ROOT%\lists\list-exclude.txt" --hostlist-exclude="%ROOT%\lists\list-exclude-user.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude-user.txt" 
+  --out-range=-d10 
+  --payload=http_req 
+   --lua-desync=fake:blob=fake_default_http:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:tcp_md5 
+   --lua-desync=fakedsplit:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:tcp_md5 
+  --new 
+--filter-tcp=443 --filter-l7=tls --hostlist-exclude="%ROOT%\lists\list-exclude.txt" --hostlist-exclude="%ROOT%\lists\list-exclude-user.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude-user.txt" --hostlist="%ROOT%\files\list-youtube.txt" 
+  --out-range=-d10 
+  --payload=tls_client_hello 
+   --lua-desync=hostfakesplit:host=www.google.com:tcp_ts=-600000:tcp_ts_up:ip_id=0 
+    
+  --new 
+--filter-tcp=443,2053,2083,2087,2096,8443 --filter-l7=tls --hostlist="%ROOT%\lists\list-general.txt" --hostlist="%ROOT%\lists\list-general-user.txt" --hostlist="%ROOT%\lists\list-google.txt" --hostlist="%ROOT%\files\list-youtube.txt" --hostlist-exclude="%ROOT%\lists\list-exclude.txt" --hostlist-exclude="%ROOT%\lists\list-exclude-user.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude-user.txt" 
+  --out-range=-d10 
+  --payload=tls_client_hello 
+   --lua-desync=fake:blob=tls_max:tcp_ts=-600000:tcp_ts_up:repeats=4 
+   --lua-desync=multisplit:pos=1:seqovl=480:seqovl_pattern=stun2:tcp_ts_up 
+  --new 
+--filter-udp=443 --filter-l7=quic --hostlist-exclude="%ROOT%\lists\list-exclude.txt" --hostlist-exclude="%ROOT%\lists\list-exclude-user.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude-user.txt" --hostlist="%ROOT%\files\list-youtube.txt" 
+  --payload=quic_initial 
+   --lua-desync=fake:blob=quic_google:repeats=11 
+  --new 
+--filter-udp=443 --filter-l7=quic --hostlist="%ROOT%\lists\list-general.txt" --hostlist="%ROOT%\lists\list-general-user.txt" --hostlist="%ROOT%\lists\list-google.txt" --hostlist="%ROOT%\files\list-youtube.txt" --hostlist-exclude="%ROOT%\lists\list-exclude.txt" --hostlist-exclude="%ROOT%\lists\list-exclude-user.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude.txt" --ipset-exclude="%ROOT%\lists\ipset-exclude-user.txt" 
+  --payload=quic_initial 
+   --lua-desync=fake:blob=fake_default_quic:repeats=11 
+  --new 
+--filter-udp=19294-19344,50000-50100 --filter-l7=discord,stun,unknown
+--out-range=-n4 --payload=all
+--lua-desync=fake:blob=quic_google:repeats=4
+--lua-desync=fake:blob=discord_udp:repeats=4
+--new
+--filter-l7=stun,discord 
+  --payload=stun,discord_ip_discovery 
+   --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=2
+
+
+
+
+
+
+
+
+
