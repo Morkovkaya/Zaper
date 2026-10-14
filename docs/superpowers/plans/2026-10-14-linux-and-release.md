@@ -21,24 +21,24 @@
 ### Task 1: Reproducible Windows artifact
 
 Files: `.github/workflows/build.yml`, `scripts/test-windows.ps1`.
-- [ ] Build with `powershell -File build.ps1 -InnoCompiler ...` on Windows.
-- [ ] Configure isolated payload and run `--self-test`, `--ui-test`, and `--test-package-service`; require exit 0 and PASS reports.
-- [ ] Install/uninstall with `/TESTMODE=1 /DIR=<temporary directory>` and check installed payload.
-- [ ] Upload installer and test evidence only after successful checks.
+- [x] Build with `powershell -File build.ps1 -InnoCompiler ...` on Windows.
+- [x] Configure isolated payload and run `--self-test`, `--ui-test`, and `--test-package-service`; require exit 0 and PASS reports.
+- [x] Install/uninstall with `/TESTMODE=1 /DIR=<temporary directory>` and check installed payload.
+- [x] Upload installer and test evidence only after successful checks.
 
 ### Task 2: Linux backend and UI
 
 Files: `linux/zapret_manager.py`, `linux/zapret_gui.py`, `linux/install.sh`, `linux/zapret2-manager.service`, `linux/README.md`, `linux/tests/test_manager.py`.
-- [ ] Build profiles from the existing runtime template, dropping WinDivert-only arguments and translating file paths into argv tokens.
-- [ ] Validate all configurations using `nfqws2 --dry-run`; test invalid inputs, profile coverage, queue loops and rollback.
-- [ ] Supervise nfqws2 and install an owned nftables table after queue readiness. Use bypass, IPv4/IPv6, fwmark loop protection and atomic cleanup on signals/errors.
-- [ ] Add settings, domain/IP exclusions, game modes, diagnostics, optional systemd management, and nonprivileged Tk GUI.
-- [ ] Install to root-owned `/opt/zapret2-manager`; preserve settings; test staging install/uninstall without touching host services.
+- [x] Build profiles from the existing runtime template, dropping WinDivert-only arguments and translating file paths into argv tokens.
+- [x] Validate all configurations using `nfqws2 --dry-run`; test invalid inputs, profile coverage, queue loops and rollback.
+- [x] Supervise nfqws2 and install an owned nftables table after queue readiness. Use bypass, IPv4/IPv6, fwmark loop protection and atomic cleanup on signals/errors.
+- [x] Add settings, domain/IP exclusions, game modes, diagnostics, optional systemd management, and nonprivileged Tk GUI.
+- [x] Install to root-owned `/opt/zapret2-manager`; preserve settings; test staging install/uninstall without touching host services.
 
 ### Task 3: Packaging and verification
 
 Files: `scripts/package-linux.py`, workflow Linux job, root README.
-- [ ] Package pinned static x86_64/aarch64 runtimes with licenses, sources links and SHA256 manifest.
-- [ ] Run unit tests, all engine profile dry runs, GUI smoke test in Xvfb, and isolated network namespace lifecycle tests.
-- [ ] Repeat checks on Debian and Fedora; run aarch64 dry runs with QEMU.
-- [ ] Publish verified Windows release; attach Linux preview builds to a prerelease and open PR with accurate validation limits.
+- [x] Package pinned static x86_64/aarch64 runtimes with licenses, sources links and SHA256 manifest.
+- [x] Run unit tests, all engine profile dry runs, GUI smoke test in Xvfb, and isolated network namespace lifecycle tests.
+- [x] Repeat checks on Debian and Fedora; run aarch64 dry runs with QEMU.
+- [ ] Attach the final Linux preview build to a prerelease and open PR with accurate validation limits (Windows release published).
