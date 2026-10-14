@@ -41,4 +41,4 @@ Files: `scripts/package-linux.py`, workflow Linux job, root README.
 - [x] Package pinned static x86_64/aarch64 runtimes with licenses, sources links and SHA256 manifest.
 - [x] Run unit tests, all engine profile dry runs, GUI smoke test in Xvfb, and isolated network namespace lifecycle tests.
 - [x] Repeat checks on Debian and Fedora; run aarch64 dry runs with QEMU.
-- [ ] Attach the final Linux preview build to a prerelease and open PR with accurate validation limits (Windows release published).
+- [x] Publish verified Windows release; attach the Linux preview to a prerelease and open PR #1 with accurate validation limits.
