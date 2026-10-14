@@ -31,3 +31,32 @@ jobs:
           name: windows-installer
           path: dist/*.exe
           if-no-files-found: error
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package pinned universal runtime
+        run: python3 scripts/package-linux.py
+      - name: Unit tests and all engine configurations
+        run: python3 -m unittest discover -s dist/Zapret2Manager-3.6.3-linux.1/tests -p test_manager.py -v
+      - name: Install test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user
+      - name: GUI smoke test
+        run: xvfb-run -a python3 dist/Zapret2Manager-3.6.3-linux.1/zapret_gui.py --smoke-test
+      - name: ARM64 real engine profile checks
+        run: python3 scripts/test-arm64.py dist/Zapret2Manager-3.6.3-linux.1
+      - name: Isolated real packet lifecycle
+        run: sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zapret2Manager-3.6.3-linux.1/tests/integration.py'
+      - name: Staged install and uninstall
+        run: |
+          cd dist/Zapret2Manager-3.6.3-linux.1
+          DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh install
+          test -x "$RUNNER_TEMP/zapret-stage/usr/local/bin/zapret2-manager"
+          DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh uninstall
+          test ! -e "$RUNNER_TEMP/zapret-stage/opt/zapret2-manager"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-universal
+          path: dist/*-universal.tar.gz
+          if-no-files-found: error

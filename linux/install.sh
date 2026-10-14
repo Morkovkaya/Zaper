@@ -1,0 +1,69 @@
+#!/bin/sh
+# DESTDIR stages files only; it never invokes host systemctl.
+set -eu
+source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+mode=${1:-install}
+stage=${DESTDIR:-}
+app="$stage/opt/zapret2-manager"
+cli="$stage/usr/local/bin/zapret2-manager"
+gui="$stage/usr/local/bin/zapret2-manager-gui"
+unit="$stage/etc/systemd/system/zapret2-manager.service"
+if [ -z "$stage" ] && [ "$(id -u)" -ne 0 ]; then
+    echo 'Use sudo ./install.sh install (or uninstall)' >&2
+    exit 1
+fi
+case "$mode" in
+ install)
+    test -f "$source_dir/runtime/sha256.json" || { echo 'Download a complete release archive first' >&2; exit 1; }
+    /usr/bin/python3 -I "$source_dir/zapret_manager.py" check >/dev/null
+    if [ -e "$app" ] && [ ! -f "$app/.zapret2-manager-install" ]; then
+        echo "$app is occupied; refusing to overwrite" >&2
+        exit 1
+    fi
+    test ! -L "$app" || { echo 'Install path must not be a symlink' >&2; exit 1; }
+    if [ -z "$stage" ] && [ -d /run/systemd/system ]; then
+        systemctl stop zapret2-manager.service 2>/dev/null || true
+    fi
+    mkdir -p "$app" "$(dirname "$cli")" "$(dirname "$unit")" "$stage/usr/share/applications"
+    cp "$source_dir/zapret_manager.py" "$source_dir/zapret_gui.py" "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
+    cp "$source_dir"/zapret2-*-source.tar.gz "$app/"
+    rm -rf "$app/runtime"
+    cp -R "$source_dir/runtime" "$app/runtime"
+    printf '%s\n' 'Zapret2 Manager installed by install.sh' > "$app/.zapret2-manager-install"
+    chmod -R go-w "$app"
+    if [ -z "$stage" ]; then chown -R root:root "$app"; fi
+    cat > "$cli" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/zapret2-manager/zapret_manager.py "$@"
+EOF
+    cat > "$gui" <<'EOF'
+#!/bin/sh
+exec /usr/bin/python3 -I /opt/zapret2-manager/zapret_gui.py "$@"
+EOF
+    chmod 755 "$cli" "$gui"
+    cp "$source_dir/zapret2-manager.service" "$unit"
+    cat > "$stage/usr/share/applications/zapret2-manager.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Zapret 2 Manager
+Comment=Native Linux network manager
+Exec=/usr/local/bin/zapret2-manager-gui
+Icon=network-wired
+Terminal=false
+Categories=Network;
+EOF
+    if [ -z "$stage" ] && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
+    echo 'Installed. GUI: zapret2-manager-gui; CLI: zapret2-manager. Start explicitly with sudo zapret2-manager start.'
+    ;;
+ uninstall)
+    test -f "$app/.zapret2-manager-install" || { echo 'No owned installation found' >&2; exit 1; }
+    if [ -z "$stage" ] && [ -d /run/systemd/system ]; then
+        systemctl disable --now zapret2-manager.service
+    fi
+    rm -rf "$app"
+    rm -f "$cli" "$gui" "$unit" "$stage/usr/share/applications/zapret2-manager.desktop"
+    if [ -z "$stage" ] && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
+    echo 'Uninstalled. /etc/zapret2-manager settings preserved.'
+    ;;
+ *) echo 'Usage: install.sh install|uninstall' >&2; exit 2 ;;
+esac
