@@ -20,14 +20,14 @@ $app = Join-Path $payload 'app\Zapret2Manager.exe'
 Run-App $app '--configure-package'
 # Keep every attempt: Cygwin initialization and the old process-enumeration
 # check can race on hosted runners. Other failures are never retried.
+function Run-Suite($suiteApp, $suiteSwitch, $report) {
 for ($attempt = 1; $attempt -le 3; $attempt++) {
-    $report = "$evidence\self-test.txt"
     try {
-        Run-App $app "--self-test `"$report`""
+        Run-App $suiteApp "$suiteSwitch `"$report`""
         break
     } catch {
         if (!(Test-Path $report)) { throw }
-        Copy-Item $report "$evidence\self-test-attempt-$attempt.txt"
+        Copy-Item $report ($report -replace '\.txt$', "-attempt-$attempt.txt")
         $text = Get-Content $report -Raw
         $failLines = @($text -split "`n" | Where-Object { $_ -match '^FAIL:' })
         $knownTransient = $failLines.Count -eq 1 -and ($failLines[0] -match 'cancelled curl process cleaned up|exit=-1073741502')
@@ -36,6 +36,8 @@ for ($attempt = 1; $attempt -le 3; $attempt++) {
         Start-Sleep -Seconds 2
     }
 }
+}
+Run-Suite $app '--self-test' "$evidence\self-test.txt"
 New-Item -ItemType Directory "$payload\app\tests" -Force | Out-Null
 Run-App $app '--ui-test'
 Copy-Item "$payload\app\tests\*" $evidence -Force
@@ -49,7 +51,7 @@ $target = Join-Path $env:RUNNER_TEMP 'zapret2-installer-test'
 $installer = Join-Path $root 'dist\Zapret2Manager-Setup-3.6.3-x64.exe'
 $p = Start-Process $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TESTMODE=1 /DIR=`"$target`" /LOG=`"$evidence\install.log`"" -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
-Run-App "$target\app\Zapret2Manager.exe" "--package-check `"$evidence\installed-check.txt`""
+Run-Suite "$target\app\Zapret2Manager.exe" '--package-check' "$evidence\installed-check.txt"
 $uninstaller = Get-ChildItem "$target\uninstall\unins*.exe" | Select-Object -First 1
 $p = Start-Process $uninstaller.FullName -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "Uninstaller failed: $($p.ExitCode)" }

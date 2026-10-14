@@ -57,11 +57,11 @@ def test_lifecycle(crash):
                 assert client.recv(1024) == b'Linux NFQUEUE echo'
                 thread.join(timeout=4)
                 assert not thread.is_alive()
-        # Local HTTP on intercepted TCP port 80 validates both directions.
-        server = subprocess.Popen([sys.executable, '-m', 'http.server', '80', '--bind', '127.0.0.1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Local HTTP on intercepted TCP port 8443 validates both directions.
+        server = subprocess.Popen([sys.executable, '-m', 'http.server', '8443', '--bind', '127.0.0.1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             time.sleep(.2)
-            manager.checked(['curl', '--noproxy', '*', '--max-time', '5', 'http://127.0.0.1/'])
+            manager.checked(['curl', '--noproxy', '*', '--max-time', '5', 'http://127.0.0.1:8443/'])
         finally:
             server.terminate()
             server.wait(timeout=5)
