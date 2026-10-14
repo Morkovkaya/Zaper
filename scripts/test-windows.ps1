@@ -4,12 +4,21 @@ $payload = Join-Path $root 'build\payload'
 $evidence = Join-Path $root 'build\evidence'
 New-Item -ItemType Directory $evidence -Force | Out-Null
 function Run-App($exe, $arguments) {
-    $p = Start-Process -FilePath $exe -ArgumentList $arguments -Wait -PassThru
+    Write-Output "RUN: $arguments"
+    $p = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru
+    if (!$p.WaitForExit(180000)) {
+        Stop-Process -Id $p.Id -Force
+        Get-ChildItem $payload -Recurse -Filter '*error*.txt' | ForEach-Object { Get-Content $_.FullName }
+        throw "Application timed out: $arguments"
+    }
+    $p.Refresh()
+    Write-Output "EXIT: $($p.ExitCode)"
     if ($p.ExitCode -ne 0) { throw "Application failed ($($p.ExitCode)): $arguments" }
 }
 $app = Join-Path $payload 'app\Zapret2Manager.exe'
 Run-App $app '--configure-package'
 Run-App $app "--self-test `"$evidence\self-test.txt`""
+New-Item -ItemType Directory "$payload\app\tests" -Force | Out-Null
 Run-App $app '--ui-test'
 Copy-Item "$payload\app\tests\*" $evidence -Force
 foreach ($report in @('self-test.txt', 'ui-test.txt', 'tray-test.txt')) {
