@@ -2,7 +2,7 @@
 [Setup]
 AppId={code:InstallerAppId}
 AppName=Zapret 2 Manager
-AppVersion=3.6.3
+AppVersion=3.7.0
 AppPublisher=Zapret 2 Manager Community
 DefaultDirName={commonappdata}\zapret2
 DisableDirPage=yes
@@ -19,7 +19,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0
 OutputDir=..\dist
-OutputBaseFilename=Zapret2Manager-Setup-3.6.3-x64
+OutputBaseFilename=Zapret2Manager-Setup-3.7.0-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -36,7 +36,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"
 Name: "service"; Description: "Установить и включить службу zapret 2 с автозапуском Windows"
 [Files]
-Source: "{#Payload}\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#Payload}\app\*"; DestDir: "{app}\app"; Excludes: "tests,tests\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "app\*,licenses\*,lua\*,http3\*,windivert.filter\*,winws2.exe,cygwin1.dll,WinDivert.dll,WinDivert64.sys,runtime-sha256.json,files\faceit_legacy_udp.bin"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\winws2.exe"; DestDir: "{app}"; Flags: ignoreversion uninsneveruninstall; Check: RuntimeDifferent('winws2.exe', 'EB9807972C15F05A00416B0549D766A71C9186F8101D406E3CC6C16278164D9E')

@@ -25,6 +25,7 @@ public sealed class TrayController:IDisposable {
  public void Open(){if(disposed||owner.IsDisposed)return;owner.Show();owner.WindowState=restored;owner.BringToFront();owner.Activate();}
  public bool HideOnClose(FormClosingEventArgs e){if(!exitRequested&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;owner.Hide();return true;}return false;}
  public void Exit(){if(disposed)return;exitRequested=true;owner.Close();if(!owner.IsDisposed)exitRequested=false;}
+ public void NotifyError(string text){if(disposed)return;string clean=Convenience.Redact(text);tray.ShowBalloonTip(6000,"Zapret 2 — ошибка",clean.Substring(0,Math.Min(200,clean.Length)),ToolTipIcon.Error);}
  public bool Released {get{return disposed;}}
  public void Refresh(string state,bool busy){if(disposed)return;bool running=state=="Running";string text=running?"Zapret включён":state=="Stopped"?"Zapret выключен":state=="NotInstalled"?"Служба не установлена":"Состояние: "+state;status.Text=text;tray.Text="Zapret 2 — "+(busy?"выполняется операция":text);tray.Icon=running?active:inactive;owner.Icon=tray.Icon;on.Enabled=!busy&&state=="Stopped";off.Enabled=restart.Enabled=!busy&&running;}
  public bool Test(){

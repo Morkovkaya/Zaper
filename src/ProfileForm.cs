@@ -1,0 +1,14 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Drawing;
+using System.Windows.Forms;
+namespace ZapretManager {
+public class ProfileForm:Form {
+ readonly ListBox list=new ListBox {Dock=DockStyle.Fill};string[] files=new string[0];
+ public ProfileForm(){Text="Профили подключения";Size=new Size(760,510);StartPosition=FormStartPosition.CenterParent;Padding=new Padding(18);var hint=new Label {Dock=DockStyle.Top,Height=70,Text="Обычный: сайты и Discord, без общей обработки игр.\nИгры + Discord: игровой UDP-профиль совместимости. Переключайте до входа в матч."};var buttons=new FlowLayoutPanel {Dock=DockStyle.Bottom,Height=115};Button(buttons,"Применить",()=>{var main=Owner as MainForm;if(main==null||list.SelectedIndex<0)return;if(list.SelectedIndex<2)main.ApplyPreset(list.SelectedIndex==1);else main.ApplySavedProfile(Core.Read<SavedProfile>(files[list.SelectedIndex-2]));Close();});Button(buttons,"Сохранить текущий",Save);Button(buttons,"Экспорт в файл",()=>{using(var picker=new SaveFileDialog {Filter="Профиль (*.json)|*.json",FileName="zapret-profile.json"})if(picker.ShowDialog(this)==DialogResult.OK)Core.Write(picker.FileName,Convenience.Profile("Переносимый профиль"));});Button(buttons,"Импорт из файла",()=>{using(var picker=new OpenFileDialog {Filter="Профиль (*.json)|*.json"})if(picker.ShowDialog(this)==DialogResult.OK){var main=Owner as MainForm;if(main!=null)main.ApplySavedProfile(Core.Read<SavedProfile>(picker.FileName));Close();}});Controls.Add(list);Controls.Add(hint);Controls.Add(buttons);UiTheme.Apply(this);RefreshProfiles();}
+ void Button(FlowLayoutPanel panel,string text,Action action){var b=new Button {Text=text,AutoSize=true,Height=42};b.Click+=(s,e)=>{try{action();}catch(Exception ex){MessageBox.Show(this,ex.Message,"Профили");}};panel.Controls.Add(b);}
+ void RefreshProfiles(){list.Items.Clear();list.Items.AddRange(new[]{"Обычный","Игры + Discord"});string directory=Core.PathOf("profiles");files=Directory.Exists(directory)?Directory.GetFiles(directory,"*.json").OrderBy(p=>p).ToArray():new string[0];foreach(var file in files){try{list.Items.Add(Core.Read<SavedProfile>(file).Name);}catch{list.Items.Add("Повреждённый профиль: "+Path.GetFileName(file));}}list.SelectedIndex=0;}
+ void Save(){using(var dialog=new Form {Text="Название профиля",Size=new Size(470,200),StartPosition=FormStartPosition.CenterParent}){var name=new TextBox {Text="Мой профиль",Dock=DockStyle.Top,MaxLength=80};var save=new Button {Text="Сохранить",Dock=DockStyle.Bottom,Height=45};dialog.Controls.Add(name);dialog.Controls.Add(save);UiTheme.Apply(dialog);save.Click+=(s,e)=>{if(string.IsNullOrWhiteSpace(name.Text))return;Directory.CreateDirectory(Core.PathOf("profiles"));Core.Write(Core.PathOf("profiles\\"+Guid.NewGuid().ToString("N")+".json"),Convenience.Profile(name.Text.Trim()));dialog.DialogResult=DialogResult.OK;};if(dialog.ShowDialog(this)==DialogResult.OK)RefreshProfiles();}}
+}
+}

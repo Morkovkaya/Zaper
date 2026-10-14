@@ -84,7 +84,7 @@ public static class Core {
  }
  public static async Task Validate(string text,CancellationToken token) {
   string f=PathOf("native-check-"+Guid.NewGuid().ToString("N")+".txt");File.WriteAllText(f,"--dry-run\r\n--wf-dup-check=0\r\n"+text,Encoding.ASCII);
-  try {var r=await Run(PathOf("winws2.exe"),"@"+Path.GetFileName(f),token,workingDirectory:Root);if(r.Exit!=0){File.Copy(f,PathOf("native-last-rejected.txt"),true);throw new InvalidOperationException("winws2 отклонил конфигурацию (exit="+r.Exit+"):\n"+r.Output+r.Error);}}finally{File.Delete(f);}
+  try {var r=await Run(PathOf("winws2.exe"),"@"+Path.GetFileName(f),token,workingDirectory:Root);if(r.Exit==unchecked((int)0xC0000142)){await Task.Delay(500,token);r=await Run(PathOf("winws2.exe"),"@"+Path.GetFileName(f),token,workingDirectory:Root);}if(r.Exit!=0){File.Copy(f,PathOf("native-last-rejected.txt"),true);throw new InvalidOperationException((r.Exit==unchecked((int)0xC0000142)?"Движок winws2 не запустился: ошибка инициализации DLL. Используйте «Проверить и исправить».":"winws2 отклонил конфигурацию (exit="+r.Exit+"):")+"\\n"+r.Output+r.Error);}}finally{File.Delete(f);}
  }
  public static void Image(string text) {ConfigureService(Service,Quote(ServicePaths.Host)+" --engine-service "+Service);}
  public static void Startup(bool auto) {ConfigureService(Service,start:auto?2u:3u);}
@@ -104,6 +104,7 @@ public static class Core {
  public static Snapshot Backup() {
   string dir=PathOf("native-backups\\"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8));Directory.CreateDirectory(dir);
   foreach(string f in new[]{"manager-base.txt","config.txt","manager-settings.json"})File.Copy(PathOf(f),Path.Combine(dir,f));
+  if(File.Exists(PathOf("app-exclusions.json")))File.Copy(PathOf("app-exclusions.json"),Path.Combine(dir,"app-exclusions.json"));
   var snap=new Snapshot {Directory=dir,State=State(),Start=3,ImagePath=""};using(var k=Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+Service)){if(k!=null){snap.Start=Convert.ToInt32(k.GetValue("Start"));snap.ImagePath=(string)k.GetValue("ImagePath");}}
   Write(Path.Combine(dir,"native-manifest.json"),snap);return snap;
  }
@@ -111,6 +112,7 @@ public static class Core {
   string full=Path.GetFullPath(snap.Directory);if(!full.StartsWith(Path.GetFullPath(PathOf("native-backups"))+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new Exception("Недопустимая резервная копия");
   if(State()!="NotInstalled")Control("Off");foreach(string f in new[]{"manager-base.txt","config.txt","manager-settings.json"})File.Copy(Path.Combine(full,f),PathOf(f),true);
   using(var k=Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+Service,true)){if(k!=null){ConfigureService(Service,snap.ImagePath,start:3);}}
+  if(File.Exists(Path.Combine(full,"app-exclusions.json")))File.Copy(Path.Combine(full,"app-exclusions.json"),PathOf("app-exclusions.json"),true);
   if(snap.State=="Running")Control("On");using(var k=Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+Service,true)){if(k!=null)ConfigureService(Service,start:(uint)snap.Start);}
  }
  public static async Task Apply(Settings settings,CancellationToken token,string baseText=null,bool tuning=false) {
