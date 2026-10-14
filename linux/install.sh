@@ -22,7 +22,9 @@ case "$mode" in
     fi
     test ! -L "$app" || { echo 'Install path must not be a symlink' >&2; exit 1; }
     if [ -z "$stage" ] && [ -d /run/systemd/system ]; then
-        systemctl stop zapret2-manager.service 2>/dev/null || true
+        if systemctl cat zapret2-manager.service >/dev/null 2>&1; then
+            systemctl stop zapret2-manager.service
+        fi
     fi
     mkdir -p "$app" "$(dirname "$cli")" "$(dirname "$unit")" "$stage/usr/share/applications"
     cp "$source_dir/zapret_manager.py" "$source_dir/zapret_gui.py" "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
@@ -55,6 +57,7 @@ Icon=network-wired
 Terminal=false
 Categories=Network;
 EOF
+    chmod 644 "$unit" "$stage/usr/share/applications/zapret2-manager.desktop"
     if [ -z "$stage" ] && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
     echo 'Installed. GUI: zapret2-manager-gui; CLI: zapret2-manager. Start explicitly with sudo zapret2-manager start.'
     ;;

@@ -12,6 +12,7 @@ import platform
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,7 @@ def load_settings(path=CONFIG):
 def atomic_save(settings, path=CONFIG):
     settings.validate()
     path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o755)
     fd, name = tempfile.mkstemp(dir=path.parent, prefix='.settings-')
     try:
         with os.fdopen(fd, 'w') as stream:
@@ -189,6 +191,7 @@ def nft_rules(settings):
  }}
  chain input {{
   type filter hook prerouting priority mangle; policy accept;
+  meta mark & {MARK} != 0 return
   ct mark & 0x20000000 != 0 return
   tcp sport {{ {tcp} }} ct reply packets <= 12 counter queue num {QUEUE} bypass
   meta l4proto udp ct reply packets <= 12 counter queue num {QUEUE} bypass
@@ -219,6 +222,16 @@ def remove_table():
     if not any(x.get('table', {}).get('comment') == 'Zapret2 Manager owned table v1' for x in data['nftables']):
         raise RuntimeError('Имя таблицы занято другой программой; удаление запрещено')
     checked(['nft', 'delete', 'table', 'inet', TABLE])
+
+
+def notify_ready():
+    address = os.environ.get('NOTIFY_SOCKET')
+    if address:
+        if address.startswith('@'):
+            address = '\0' + address[1:]
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as notifier:
+            notifier.connect(address)
+            notifier.sendall(b'READY=1')
 
 
 def supervise(settings, runtime=RUNTIME):
@@ -256,6 +269,7 @@ def supervise(settings, runtime=RUNTIME):
             rules = nft_rules(settings)
             checked(['nft', '-c', '-f', '-'], input=rules)
             checked(['nft', '-f', '-'], input=rules)
+            notify_ready()
             print('READY: Zapret2 Manager, IPv4/IPv6', flush=True)
             while not stopping:
                 if process.poll() is not None:

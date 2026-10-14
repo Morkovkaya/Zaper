@@ -55,6 +55,16 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual([x['success'] for x in result['probes']], [True, True, True, False])
         self.assertIn('Anti-Cheat', result['note'])
 
+    def test_systemd_notified_only_explicitly(self):
+        import socket
+        with tempfile.TemporaryDirectory() as temp, socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as server:
+            path = str(Path(temp) / 'notify')
+            server.bind(path)
+            server.settimeout(1)
+            with patch.dict(manager.os.environ, {'NOTIFY_SOCKET': path}):
+                manager.notify_ready()
+            self.assertEqual(server.recv(1024), b'READY=1')
+
     def test_detect_queue_owner(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'queues'

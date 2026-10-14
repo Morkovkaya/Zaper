@@ -53,7 +53,7 @@ jobs:
       - name: Isolated real packet lifecycle
         run: |
           cp -R dist/Zapret2Manager-3.6.3-linux.1 /tmp/zapret2-ci
-          sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
+          sudo unshare --net sh -c 'ip link set lo up; setpriv --bounding-set=-all,+net_admin,+net_raw,+setuid,+setgid,+setpcap,+kill --no-new-privs env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
       - name: Staged install and uninstall
         run: |
           cd dist/Zapret2Manager-3.6.3-linux.1
