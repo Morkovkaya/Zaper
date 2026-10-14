@@ -4,6 +4,12 @@ on:
     branches: [main, 'feat/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      windows_ref:
+        description: 'Optional Windows release commit/tag; ordinary CI checks the current commit'
+        required: false
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -14,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: 9561c870d7f54dc2ece89b571f03b72e15eb8725
+          ref: ${{ inputs.windows_ref || github.sha }}
           path: windows-source
       - name: Install Inno Setup
         shell: powershell

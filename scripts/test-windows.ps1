@@ -48,7 +48,7 @@ foreach ($report in @('self-test.txt', 'ui-test.txt', 'tray-test.txt')) {
 Run-App $app '--test-package-service'
 Copy-Item "$payload\package-service-test.txt" $evidence
 $target = Join-Path $env:RUNNER_TEMP 'zapret2-installer-test'
-$installer = Join-Path $root 'dist\Zapret2Manager-Setup-3.6.3-x64.exe'
+$installer = (Get-ChildItem "$root\dist\Zapret2Manager-Setup-*-x64.exe" | Select-Object -First 1).FullName
 $p = Start-Process $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TESTMODE=1 /DIR=`"$target`" /LOG=`"$evidence\install.log`"" -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
 Run-Suite "$target\app\Zapret2Manager.exe" '--package-check' "$evidence\installed-check.txt"
