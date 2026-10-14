@@ -4,6 +4,7 @@ $root=$PSScriptRoot
 $payload=Join-Path $root 'build\payload'
 New-Item -ItemType Directory $payload -Force | Out-Null
 Copy-Item "$root\vendor\runtime\*" $payload -Recurse -Force
+Copy-Item "$root\LICENSE" "$payload\licenses\Zapret2Manager-MIT.txt" -Force
 $app=Join-Path $payload 'app'
 New-Item -ItemType Directory $app -Force | Out-Null
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
