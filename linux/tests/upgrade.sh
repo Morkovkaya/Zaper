@@ -3,10 +3,14 @@
 set -eu
 legacy=$1
 current=$2
-mkdir -p /tmp/zaper-legacy
- tar -xzf "$legacy" -C /tmp/zaper-legacy
+task_legacy_dir=$(mktemp -d /tmp/zaper-legacy.XXXXXX)
+trap 'rm -rf "$task_legacy_dir"' EXIT HUP INT TERM
+tar -xzf "$legacy" -C "$task_legacy_dir"
+task_bundle=$(basename "$legacy" -universal.tar.gz)
+# This script is only for disposable test environments, with no production settings.
+rm -f /etc/zapret2-manager/settings.json /etc/zapret2-manager/ipset-all.txt
 umask 077
-/tmp/zaper-legacy/Zapret2Manager-3.6.3-linux.1/install.sh install
+"$task_legacy_dir/$task_bundle/install.sh" install
 zapret2-manager configure --game udp --ipset loaded --exclude-domain keep.example.org
 printf '%s\n' 'custom.example.org' > /opt/zapret2-manager/runtime/lists/list-general-user.txt
 cp /etc/zapret2-manager/settings.json /tmp/before-settings.json
@@ -32,7 +36,7 @@ value = json.loads(Path('/tmp/restored.json').read_text())
 assert value['game'] == 'udp' and value['ipset'] == 'loaded'
 assert value['excluded_domains'] == ['keep.example.org']
 assert len(json.loads(Path('/tmp/history.json').read_text())) >= 2
-print('PASS: upgrade from 3.6.3 preserves config/user lists; profiles/history, root repair and umask 077')
+print('PASS: upgrade preserves config/user lists; profiles/history, root repair and umask 077')
 PY
 "$current/install.sh" uninstall
 test -f /etc/zapret2-manager/settings.json

@@ -79,7 +79,7 @@ class App:
             ttk.Label(settings, text=label).grid(row=n, column=0, sticky='w', pady=7)
             ttk.Combobox(settings, textvariable=variable, values=values, state='readonly').grid(row=n, column=1, sticky='ew', padx=12)
         settings.columnconfigure(1, weight=1)
-        ttk.Label(settings, text='Игровой режим работает при IPSet loaded/any. Применение сохраняет прежнее состояние службы; ошибка возвращает настройки.').grid(row=4, column=0, columnspan=2, sticky='w', pady=10)
+        ttk.Label(settings, text='Игровой режим работает при IPSet loaded/any. Применение сохраняет прежнее состояние службы; ошибка возвращает настройки.', wraplength=680).grid(row=4, column=0, columnspan=2, sticky='w', pady=10)
         self.button(settings, 'Сохранить и проверить', self.save).grid(row=5, column=0, sticky='w', pady=7)
         self.button(settings, 'Исключения доменов / IP / UID', self.exclusions).grid(row=5, column=1, sticky='w')
         self.button(settings, 'Настройки запуска и трея', self.launch_dialog).grid(row=6, column=0, columnspan=2, sticky='w', pady=7)

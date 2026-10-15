@@ -49,7 +49,7 @@ jobs:
       - name: Package pinned universal runtime
         run: python3 scripts/package-linux.py
       - name: Install test tools
-        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user curl openssl python3-pystray trayer gsettings-desktop-schemas dconf-cli dbus-x11 libkf5config-bin
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user curl openssl python3-pystray trayer gsettings-desktop-schemas libglib2.0-bin dconf-cli dbus-x11 libkf5config-bin
       - name: Unit tests and all engine configurations
         run: python3 -m unittest discover -s dist/Zaper-3.8.1-linux.2/tests -p 'test_*.py' -v
       - name: GUI smoke test
@@ -86,6 +86,12 @@ jobs:
           gh release download v3.6.3-linux.1 -R "$GITHUB_REPOSITORY" -p Zapret2Manager-3.6.3-linux.1-universal.tar.gz -D "$RUNNER_TEMP/legacy"
       - name: Real legacy upgrade and repair (disposable runner)
         run: sudo /tmp/zapret2-ci/tests/upgrade.sh "$RUNNER_TEMP/legacy/Zapret2Manager-3.6.3-linux.1-universal.tar.gz" /tmp/zapret2-ci
+      - name: Download previous 3.8.1 Linux release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v3.8.1-linux.1 -R "$GITHUB_REPOSITORY" -p Zaper-3.8.1-linux.1-universal.tar.gz -D "$RUNNER_TEMP/legacy-381"
+      - name: Upgrade from previous 3.8.1 Linux release
+        run: sudo /tmp/zapret2-ci/tests/upgrade.sh "$RUNNER_TEMP/legacy-381/Zaper-3.8.1-linux.1-universal.tar.gz" /tmp/zapret2-ci
       - uses: actions/upload-artifact@v4
         with:
           name: linux-universal

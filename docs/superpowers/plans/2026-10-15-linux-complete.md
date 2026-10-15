@@ -16,21 +16,21 @@
 
 ### Task 1: Settings and network diagnostics
 Files: linux/zapret_manager.py, zaper_state.py, new zaper_network.py, tests/test_network.py.
-- [ ] Add validated Discord/game fake selection, auto-check, separate FACEIT server exclusions; preserve Windows profile fields on import.
-- [ ] Implement cancellable curl probes with semantic content validation, optional HTTP/3 capability detection, STUN transaction validation, FACEIT region/HTTPS/A2S challenge diagnostics.
-- [ ] Test malformed STUN/A2S, semantic HTTPS failures, cancellation cleanup and all fake/strategy configurations with the real engine.
+- [x] Add validated Discord/game fake selection, auto-check, separate FACEIT server exclusions; preserve Windows profile fields on import.
+- [x] Implement cancellable curl probes with semantic content validation, optional HTTP/3 capability detection, STUN transaction validation, FACEIT region/HTTPS/A2S challenge diagnostics.
+- [x] Test malformed STUN/A2S, semantic HTTPS failures, cancellation cleanup and all fake/strategy configurations with the real engine.
 
 ### Task 2: Auto-tune and recovery
 Files: new linux/zaper_tune.py, zaper_commands.py, zapret_gui.py, tests/test_tune.py.
-- [ ] Implement Windows winner policy (success ratio, P90/median and 15%/50ms hysteresis), all nine candidates and finalist recheck.
-- [ ] Persist original bytes/running state and history under operation lock; rollback on failure/cancel; recover after SIGKILL before next start. Preserve last successful backup for explicit undo.
-- [ ] Expose run/cancel/recover/results; GUI shows progress without blocking Tk. Test success, all-fail, cancel, journal recovery, locked concurrency and prior running/stopped state.
+- [x] Implement Windows winner policy (success ratio, P90/median and 15%/50ms hysteresis), all nine candidates and finalist recheck.
+- [x] Persist original bytes/running state and history under operation lock; rollback on failure/cancel; recover after SIGKILL before next start. Preserve last successful backup for explicit undo.
+- [x] Expose run/cancel/recover/results; GUI shows progress without blocking Tk. Test success, all-fail, cancel, journal recovery, locked concurrency and prior running/stopped state.
 
 ### Task 3: Upload proxy limiter
 Files: new linux/zaper_proxy.py, zapret_gui.py, zaper_commands.py, tests/test_proxy.py.
-- [ ] Add aggregate upload pacing (1–1000 Mbps), unrestricted downloads, half-close forwarding, bounded connection cleanup and loopback-only endpoints.
-- [ ] Add explicit GNOME/KDE desktop integration and manual endpoint mode; snapshots, rollback, crash watchdog, next-login recovery, ownership-aware restoration and duplicate-instance lock.
-- [ ] Test real concurrent transfers/rate bounds/half-close, desktop adapter fixtures, relay crash recovery, startup failure, port collision and preserving an externally changed proxy.
+- [x] Add aggregate upload pacing (1–1000 Mbps), unrestricted downloads, half-close forwarding, bounded connection cleanup and loopback-only endpoints.
+- [x] Add explicit GNOME/KDE desktop integration and manual endpoint mode; snapshots, rollback, crash watchdog, next-login recovery, ownership-aware restoration and duplicate-instance lock.
+- [x] Test real concurrent transfers/rate bounds/half-close, desktop adapter fixtures, relay crash recovery, startup failure, port collision and preserving an externally changed proxy.
 
 ### Task 4: Delivery
 Files: linux/README.md, version/workflow/tests/installer, docs/VALIDATION.md.

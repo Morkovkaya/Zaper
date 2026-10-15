@@ -37,6 +37,11 @@ try:
     dialogs = [x for x in root.winfo_children() if isinstance(x, tk.Toplevel)]
     assert len(dialogs) == 1
     dialogs[0].destroy()
+    app.update_dialog()
+    root.update()
+    next(x for x in root.winfo_children() if isinstance(x,tk.Toplevel)).destroy()
+    app.events.put(('progress',{'progress':45,'message':'Fixture progress'}))
+    wait(root,lambda:app.progress.get()==45)
     app.faceit_dialog()
     root.update()
     next(x for x in root.winfo_children() if isinstance(x,tk.Toplevel)).destroy()

@@ -489,7 +489,7 @@ def main(argv=None):
                 if load_settings().auto_check:
                     from zaper_network import measure
                     print(json.dumps(measure(1), ensure_ascii=False))
-                print('Настройки проверены и сохранены. Перезапустите службу, чтобы применить их.')
+                print('Настройки проверены и применены; прежнее состояние службы сохранено.' if args.apply else 'Настройки проверены и сохранены. Перезапустите службу, чтобы применить их.')
         return 0
     except (ValueError, TypeError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print('Ошибка: ' + str(exc), file=sys.stderr)
