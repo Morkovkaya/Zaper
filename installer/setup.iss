@@ -1,8 +1,10 @@
 #define Payload "..\build\payload"
 [Setup]
 AppId={code:InstallerAppId}
-AppName=Zapret 2 Manager
-AppVersion=3.6.3
+AppName=Zaper
+; Keep installer recognition compatible with the 3.7/3.8 update dialogs.
+VersionInfoProductName=Zapret 2 Manager
+AppVersion=3.8.1
 AppPublisher=Zapret 2 Manager Community
 DefaultDirName={commonappdata}\zapret2
 DisableDirPage=yes
@@ -12,14 +14,14 @@ UsePreviousGroup=no
 UsePreviousTasks=no
 UsePreviousUserInfo=no
 UsePreviousSetupType=no
-DefaultGroupName=Zapret 2 Manager
+DefaultGroupName=Zaper
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0
 OutputDir=..\dist
-OutputBaseFilename=Zapret2Manager-Setup-3.6.3-x64
+OutputBaseFilename=Zapret2Manager-Setup-3.8.1-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -29,14 +31,15 @@ UninstallDisplayIcon={app}\app\Zapret2Manager.exe
 UninstallFilesDir={app}\uninstall
 InfoBeforeFile=install-info.txt
 SetupLogging=yes
+SetupIconFile=..\assets\zaper.ico
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
-Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"
+Name: "desktopicon"; Description: "Создать ярлык Zaper на рабочем столе"
 Name: "service"; Description: "Установить и включить службу zapret 2 с автозапуском Windows"
 [Files]
-Source: "{#Payload}\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#Payload}\app\*"; DestDir: "{app}\app"; Excludes: "tests,tests\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\*"; DestDir: "{app}"; Excludes: "app\*,licenses\*,lua\*,http3\*,windivert.filter\*,winws2.exe,cygwin1.dll,WinDivert.dll,WinDivert64.sys,runtime-sha256.json,files\faceit_legacy_udp.bin"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\winws2.exe"; DestDir: "{app}"; Flags: ignoreversion uninsneveruninstall; Check: RuntimeDifferent('winws2.exe', 'EB9807972C15F05A00416B0549D766A71C9186F8101D406E3CC6C16278164D9E')
@@ -49,12 +52,15 @@ Source: "{#Payload}\lua\*"; DestDir: "{app}\lua"; Flags: ignoreversion recursesu
 Source: "{#Payload}\http3\*"; DestDir: "{app}\http3"; Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\windivert.filter\*"; DestDir: "{app}\windivert.filter"; Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\app\Zapret2Manager.exe"; DestName: "SetupRepair.exe"; Flags: dontcopy
+[InstallDelete]
+Type: files; Name: "{autodesktop}\Управление zapret 2.lnk"; Check: Not TestMode
+Type: files; Name: "{autodesktop}\zaper.lnk"; Tasks: desktopicon; Check: Not TestMode
 [Icons]
-Name: "{group}\Zapret 2 Manager"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Check: Not TestMode
-Name: "{group}\Удалить Zapret 2 Manager"; Filename: "{uninstallexe}"; Check: Not TestMode
-Name: "{autodesktop}\Управление zapret 2"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Tasks: desktopicon; Check: Not TestMode
+Name: "{group}\Zaper"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Check: Not TestMode
+Name: "{group}\Удалить Zaper"; Filename: "{uninstallexe}"; Check: Not TestMode
+Name: "{autodesktop}\Zaper"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Tasks: desktopicon; Check: Not TestMode
 [Run]
-Filename: "{app}\app\Zapret2Manager.exe"; Description: "Открыть Zapret 2 Manager"; Flags: postinstall nowait skipifsilent runascurrentuser; Check: Not TestMode
+Filename: "{app}\app\Zapret2Manager.exe"; Description: "Открыть Zaper"; Flags: postinstall nowait skipifsilent runascurrentuser; Check: Not TestMode
 [Code]
 function InstallerAppId(Param: String): String;
 begin

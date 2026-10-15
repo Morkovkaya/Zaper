@@ -45,6 +45,7 @@ foreach ($report in @('self-test.txt', 'ui-test.txt', 'tray-test.txt')) {
     $text = Get-Content (Join-Path $evidence $report) -Raw
     if ($text -match '(?m)^FAIL:' -or $text -notmatch 'PASS') { throw "Failed report: $report`n$text" }
 }
+Run-App $app "--test-convenience `"$evidence\convenience.txt`" --integration"
 Run-App $app '--test-package-service'
 Copy-Item "$payload\package-service-test.txt" $evidence
 $target = Join-Path $env:RUNNER_TEMP 'zapret2-installer-test'

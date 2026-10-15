@@ -27,10 +27,18 @@ case "$mode" in
         fi
     fi
     mkdir -p "$app" "$(dirname "$cli")" "$(dirname "$unit")" "$stage/usr/share/applications"
-    cp "$source_dir/zapret_manager.py" "$source_dir/zapret_gui.py" "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
+    cp "$source_dir"/*.py "$source_dir"/runtime-repair.* "$source_dir"/zaper.png "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
     cp "$source_dir"/zapret2-*-source.tar.gz "$app/"
+    task_user_lists=$(mktemp -d)
+    trap 'rm -rf "$task_user_lists"' EXIT HUP INT TERM
+    for task_user_file in "$app"/runtime/lists/*-user.txt; do
+        if [ -f "$task_user_file" ]; then cp "$task_user_file" "$task_user_lists/"; fi
+    done
     rm -rf "$app/runtime"
     cp -R "$source_dir/runtime" "$app/runtime"
+    for task_user_file in "$task_user_lists"/*; do
+        if [ -f "$task_user_file" ]; then cp "$task_user_file" "$app/runtime/lists/"; fi
+    done
     printf '%s\n' 'Zapret2 Manager installed by install.sh' > "$app/.zapret2-manager-install"
     find "$app" -type d -exec chmod 755 {} +
     find "$app" -type f -exec chmod 644 {} +
@@ -46,14 +54,20 @@ EOF
 exec /usr/bin/python3 -I /opt/zapret2-manager/zapret_gui.py "$@"
 EOF
     chmod 755 "$cli" "$gui"
+    ln -sf zapret2-manager "$stage/usr/local/bin/zaper"
+    ln -sf zapret2-manager-gui "$stage/usr/local/bin/zaper-gui"
+    mkdir -p "$stage/usr/share/icons/hicolor/32x32/apps"
+    chmod 755 "$stage/usr/share/icons" "$stage/usr/share/icons/hicolor" "$stage/usr/share/icons/hicolor/32x32" "$stage/usr/share/icons/hicolor/32x32/apps"
+    cp "$source_dir/zaper.png" "$stage/usr/share/icons/hicolor/32x32/apps/zaper.png"
+    chmod 644 "$stage/usr/share/icons/hicolor/32x32/apps/zaper.png"
     cp "$source_dir/zapret2-manager.service" "$unit"
     cat > "$stage/usr/share/applications/zapret2-manager.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Zapret 2 Manager
+Name=Zaper
 Comment=Native Linux network manager
 Exec=/usr/local/bin/zapret2-manager-gui
-Icon=network-wired
+Icon=zaper
 Terminal=false
 Categories=Network;
 EOF
@@ -67,7 +81,7 @@ EOF
         systemctl disable --now zapret2-manager.service
     fi
     rm -rf "$app"
-    rm -f "$cli" "$gui" "$unit" "$stage/usr/share/applications/zapret2-manager.desktop"
+    rm -f "$cli" "$gui" "$stage/usr/local/bin/zaper" "$stage/usr/local/bin/zaper-gui" "$stage/usr/share/icons/hicolor/32x32/apps/zaper.png" "$unit" "$stage/usr/share/applications/zapret2-manager.desktop"
     if [ -z "$stage" ] && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
     echo 'Uninstalled. /etc/zapret2-manager settings preserved.'
     ;;

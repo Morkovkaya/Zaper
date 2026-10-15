@@ -5,11 +5,14 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import sys
 import tarfile
 import tempfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'linux'))
+from zaper_version import BUNDLE_NAME
 VERSION = 'v1.0.5.2'
 HASHES = {
     'x86_64': 'de1414b1e0f9a5659d438cddcb0c7e9099b4533bf5c8a3cf841c7bc7e5aa1473',
@@ -27,7 +30,7 @@ def package(archive, output):
         with tarfile.open(archive) as tar:
             tar.extractall(temp, filter='data')
         upstream = temp / ('zapret2-' + VERSION)
-        dest = output / 'Zapret2Manager-3.6.3-linux.1'
+        dest = output / BUNDLE_NAME
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(ROOT / 'linux', dest, ignore=shutil.ignore_patterns('__pycache__', 'runtime'))
@@ -52,8 +55,11 @@ def package(archive, output):
             shutil.copy2(binary, target)
             (target / 'nfqws2').chmod(0o755)
         hashes = {str(x.relative_to(runtime)): hashlib.sha256(x.read_bytes()).hexdigest()
-                  for x in sorted(runtime.rglob('*')) if x.is_file()}
+                  for x in sorted(runtime.rglob('*')) if x.is_file() and not x.name.endswith('-user.txt')}
         (runtime / 'sha256.json').write_text(json.dumps(hashes, indent=2) + '\n')
+        with tarfile.open(dest / 'runtime-repair.tar.gz', 'w:gz') as backup:
+            backup.add(runtime, arcname='runtime')
+        (dest / 'runtime-repair.sha256').write_text(hashlib.sha256((dest / 'runtime-repair.tar.gz').read_bytes()).hexdigest() + '\n')
         result = output / (dest.name + '-universal.tar.gz')
         with tarfile.open(result, 'w:gz') as tar:
             tar.add(dest, arcname=dest.name)

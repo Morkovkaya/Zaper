@@ -48,25 +48,36 @@ jobs:
       - uses: actions/checkout@v4
       - name: Package pinned universal runtime
         run: python3 scripts/package-linux.py
-      - name: Unit tests and all engine configurations
-        run: python3 -m unittest discover -s dist/Zapret2Manager-3.6.3-linux.1/tests -p test_manager.py -v
       - name: Install test tools
-        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user curl openssl python3-pystray trayer
+      - name: Unit tests and all engine configurations
+        run: python3 -m unittest discover -s dist/Zaper-3.8.1-linux.1/tests -p 'test_*.py' -v
       - name: GUI smoke test
-        run: xvfb-run -a python3 dist/Zapret2Manager-3.6.3-linux.1/zapret_gui.py --smoke-test
+        run: xvfb-run -a python3 dist/Zaper-3.8.1-linux.1/tests/gui_smoke.py
+      - name: Real X11 tray lifecycle
+        run: |
+          cd dist/Zaper-3.8.1-linux.1
+          PYSTRAY_BACKEND=xorg xvfb-run -a sh -c 'trayer --edge top --align right --widthtype request --height 28 & task_tray_pid=$!; sleep 1; python3 tests/gui_smoke.py --tray; task_status=$?; kill "$task_tray_pid"; exit "$task_status"'
       - name: ARM64 real engine profile checks
-        run: python3 scripts/test-arm64.py dist/Zapret2Manager-3.6.3-linux.1
+        run: python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.1
       - name: Isolated real packet lifecycle
         run: |
-          cp -R dist/Zapret2Manager-3.6.3-linux.1 /tmp/zapret2-ci
+          cp -R dist/Zaper-3.8.1-linux.1 /tmp/zapret2-ci
           sudo unshare --net sh -c 'ip link set lo up; setpriv --bounding-set=-all,+net_admin,+net_raw,+setuid,+setgid,+setpcap,+kill --no-new-privs env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
       - name: Staged install and uninstall
         run: |
-          cd dist/Zapret2Manager-3.6.3-linux.1
+          cd dist/Zaper-3.8.1-linux.1
           DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh install
           test -x "$RUNNER_TEMP/zapret-stage/usr/local/bin/zapret2-manager"
           DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh uninstall
           test ! -e "$RUNNER_TEMP/zapret-stage/opt/zapret2-manager"
+      - name: Download legacy Linux release for upgrade test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v3.6.3-linux.1 -R "$GITHUB_REPOSITORY" -p Zapret2Manager-3.6.3-linux.1-universal.tar.gz -D "$RUNNER_TEMP/legacy"
+      - name: Real legacy upgrade and repair (disposable runner)
+        run: sudo /tmp/zapret2-ci/tests/upgrade.sh "$RUNNER_TEMP/legacy/Zapret2Manager-3.6.3-linux.1-universal.tar.gz" /tmp/zapret2-ci
       - uses: actions/upload-artifact@v4
         with:
           name: linux-universal

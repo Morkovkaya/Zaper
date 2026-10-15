@@ -18,7 +18,9 @@ import sys
 import tempfile
 import time
 
-VERSION = '3.6.3-linux.1'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from zaper_version import VERSION
+sys.modules.setdefault('zapret_manager', sys.modules[__name__])
 HOME = Path(__file__).resolve().parent
 RUNTIME = HOME / 'runtime'
 CONFIG = Path('/etc/zapret2-manager/settings.json')
@@ -26,6 +28,7 @@ SERVICE = 'zapret2-manager.service'
 TABLE = 'zapret2_manager'
 QUEUE = 200
 MARK = '0x40000000'
+STRATEGIES = ('current', 'udp-2', 'udp-6', 'split', 'disorder', 'fake-md5', 'fake-ts', 'host-ts', 'host-seq')
 
 
 @dataclasses.dataclass
@@ -33,6 +36,7 @@ class Settings:
     game: str = 'off'
     ipset: str = 'none'
     strategy: str = 'current'
+    game_udp_preset: str = 'native'
     excluded_uids: list = dataclasses.field(default_factory=list)
     excluded_ips: list = dataclasses.field(default_factory=list)
     excluded_domains: list = dataclasses.field(default_factory=list)
@@ -42,8 +46,12 @@ class Settings:
             raise ValueError('Неизвестный игровой режим')
         if self.ipset not in ('none', 'loaded', 'any'):
             raise ValueError('Неизвестная область IPSet')
-        if self.strategy not in ('current', 'split', 'disorder'):
+        if self.strategy not in STRATEGIES:
             raise ValueError('Неизвестная стратегия')
+        if self.game_udp_preset not in ('native', 'alt12-exp'):
+            raise ValueError('Неизвестный игровой UDP-профиль')
+        if any(not isinstance(x, list) or len(x) > 10000 for x in (self.excluded_ips, self.excluded_domains, self.excluded_uids)):
+            raise ValueError('Исключения должны быть списками ограниченного размера')
         if len(self.excluded_uids) > 128 or any(type(x) is not int or not 0 <= x < 2**32 for x in self.excluded_uids):
             raise ValueError('UID должен быть целым числом от 0 до 4294967295')
         for value in self.excluded_ips:
@@ -54,11 +62,13 @@ class Settings:
         return self
 
 
-def load_settings(path=CONFIG):
+def load_settings(path=None):
+    path = CONFIG if path is None else path
     return Settings(**json.loads(path.read_text())).validate() if path.exists() else Settings()
 
 
-def atomic_save(settings, path=CONFIG):
+def atomic_save(settings, path=None):
+    path = CONFIG if path is None else path
     settings.validate()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.parent.chmod(0o755)
@@ -75,7 +85,8 @@ def atomic_save(settings, path=CONFIG):
         Path(name).unlink(missing_ok=True)
 
 
-def engine(runtime=RUNTIME):
+def engine(runtime=None):
+    runtime = RUNTIME if runtime is None else Path(runtime)
     arch = {'x86_64': 'x86_64', 'amd64': 'x86_64', 'aarch64': 'arm64', 'arm64': 'arm64'}.get(platform.machine().lower())
     if arch is None:
         raise RuntimeError('Поддерживаются Linux x86_64 и ARM64; для другой архитектуры соберите nfqws2 из исходников')
@@ -85,7 +96,8 @@ def engine(runtime=RUNTIME):
     return binary
 
 
-def verify_runtime(runtime=RUNTIME):
+def verify_runtime(runtime=None):
+    runtime = RUNTIME if runtime is None else Path(runtime)
     manifest = json.loads((runtime / 'sha256.json').read_text())
     if not manifest:
         raise RuntimeError('Пустой манифест runtime')
@@ -98,7 +110,8 @@ def verify_runtime(runtime=RUNTIME):
     return engine(runtime)
 
 
-def build_args(settings, runtime=RUNTIME):
+def build_args(settings, runtime=None):
+    runtime = RUNTIME if runtime is None else Path(runtime)
     """Translate WinDivert template into argv, preserving paths with spaces."""
     settings.validate()
     text = (runtime / 'manager-base.template').read_text()
@@ -107,7 +120,9 @@ def build_args(settings, runtime=RUNTIME):
     args[:0] = [f'--qnum={QUEUE}', f'--fwmark={MARK}']
     for blob in ('quic_google', 'discord_udp'):
         args = [x + ':payload=all' if x == f'--lua-desync=fake:blob={blob}:repeats=4' else x for x in args]
-    if settings.strategy != 'current':
+    if settings.strategy in ('udp-2', 'udp-6'):
+        args = [x.replace(':repeats=4:payload=all', ':repeats=' + settings.strategy[-1] + ':payload=all') if x.startswith(('--lua-desync=fake:blob=quic_google:', '--lua-desync=fake:blob=discord_udp:')) else x for x in args]
+    elif settings.strategy != 'current':
         sections = [[]]
         for arg in args:
             if arg == '--new':
@@ -117,7 +132,14 @@ def build_args(settings, runtime=RUNTIME):
         for section in sections:
             if '--filter-l7=tls' in section and '--payload=tls_client_hello' in section:
                 section[:] = [x for x in section if not x.startswith('--lua-desync=')]
-                section.append('--lua-desync=' + ('multisplit:pos=1,midsld' if settings.strategy == 'split' else 'multidisorder:pos=midsld'))
+                actions = {
+                    'split': ['multisplit:pos=1,midsld'], 'disorder': ['multidisorder:pos=midsld'],
+                    'fake-md5': ['fake:blob=fake_default_tls:tcp_md5:tcp_seq=-10000:repeats=6', 'multidisorder:pos=1,midsld'],
+                    'fake-ts': ['fake:blob=tls_max:tcp_ts=-600000:tcp_ts_up:repeats=4', 'multisplit:pos=1:seqovl=480:seqovl_pattern=stun2:tcp_ts_up'],
+                    'host-ts': ['hostfakesplit:host=www.google.com:tcp_ts=-600000:tcp_ts_up:ip_id=0'],
+                    'host-seq': ['hostfakesplit:host=www.google.com:tcp_seq=-10000:tcp_md5'],
+                }
+                section.extend('--lua-desync=' + x for x in actions[settings.strategy])
         args = []
         for section in sections:
             if args:
@@ -144,6 +166,17 @@ def build_args(settings, runtime=RUNTIME):
                 '--out-range=-n4', '--payload=all',
                 '--lua-desync=fake:blob=quic_google:repeats=5:payload=all',
                 '--lua-desync=fake:blob=game_udp:repeats=5:payload=all']
+    if settings.game_udp_preset == 'alt12-exp' and settings.game in ('udp', 'all') and settings.ipset != 'none':
+        args.insert(2, f'--blob=faceit_legacy_udp:@{runtime}/files/faceit_legacy_udp.bin')
+        start = args.index('--filter-udp=1024-65535')
+        section = args[start:]
+        section = [x for x in section if not x.startswith('--lua-desync=')]
+        section = ['--out-range=<n4' if x == '--out-range=-n4' else '--payload=unknown' if x == '--payload=all' else x for x in section]
+        args[start:] = section + ['--filter-l7=unknown', '--lua-desync=fake:blob=faceit_legacy_udp:repeats=10:payload=unknown']
+    # Mutable IP lists live outside the immutable runtime; updates preserve its manifest.
+    from zaper_state import IP_OVERLAY
+    if IP_OVERLAY.is_file():
+        args = [f'--ipset={IP_OVERLAY}' if x == f'--ipset={runtime}/lists/ipset-all.txt' else x for x in args]
     # Apply exclusions to each profile, including the first. No temporary user files.
     global_ex = []
     if settings.excluded_ips:
@@ -165,7 +198,8 @@ def checked(command, **kwargs):
     return result.stdout
 
 
-def validate_engine(settings, runtime=RUNTIME):
+def validate_engine(settings, runtime=None):
+    runtime = RUNTIME if runtime is None else Path(runtime)
     binary = verify_runtime(runtime)
     return checked([binary, '--dry-run'] + build_args(settings, runtime))
 
@@ -234,7 +268,8 @@ def notify_ready():
             notifier.sendall(b'READY=1')
 
 
-def supervise(settings, runtime=RUNTIME):
+def supervise(settings, runtime=None):
+    runtime = RUNTIME if runtime is None else Path(runtime)
     require_root()
     if not shutil.which('nft'):
         raise RuntimeError('Установите nftables')
@@ -244,7 +279,7 @@ def supervise(settings, runtime=RUNTIME):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError('Zapret2 Manager уже запущен') from None
+            raise RuntimeError('Zaper уже запущен') from None
         if queue_owner() is not None:
             raise RuntimeError(f'Очередь {QUEUE} занята другой программой')
         remove_table()  # Recover an owned table left after power loss or SIGKILL.
@@ -270,7 +305,7 @@ def supervise(settings, runtime=RUNTIME):
             checked(['nft', '-c', '-f', '-'], input=rules)
             checked(['nft', '-f', '-'], input=rules)
             notify_ready()
-            print('READY: Zapret2 Manager, IPv4/IPv6', flush=True)
+            print('READY: Zaper, IPv4/IPv6', flush=True)
             while not stopping:
                 if process.poll() is not None:
                     raise RuntimeError(f'nfqws2 завершился: {process.returncode}')
@@ -317,7 +352,7 @@ def network_probes():
         start = time.monotonic()
         row = {'target': name, 'url': url, 'success': False, 'http': 0}
         try:
-            request = urllib.request.Request(url, headers={'User-Agent': 'Zapret2Manager/' + VERSION})
+            request = urllib.request.Request(url, headers={'User-Agent': 'Zaper/' + VERSION})
             with opener.open(request, timeout=6) as response:
                 row['http'] = response.status
                 body = response.read(1024 * 1024)
@@ -344,7 +379,12 @@ def diagnostics():
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Zapret 2 Manager — Linux')
+    from zaper_commands import run
+    argv = sys.argv[1:] if argv is None else argv
+    advanced = run(argv)
+    if advanced is not None:
+        return advanced
+    parser = argparse.ArgumentParser(description='Zaper — Linux')
     parser.add_argument('--version', action='version', version=VERSION)
     commands = parser.add_subparsers(dest='command', required=True)
     for name in ('check', 'show', 'diagnose', 'run', 'start', 'stop', 'restart', 'enable', 'disable', 'status', 'probe', 'verify'):
@@ -352,7 +392,8 @@ def main(argv=None):
     config = commands.add_parser('configure')
     config.add_argument('--game', choices=['off', 'tcp', 'udp', 'all'])
     config.add_argument('--ipset', choices=['none', 'loaded', 'any'])
-    config.add_argument('--strategy', choices=['current', 'split', 'disorder'])
+    config.add_argument('--strategy', choices=STRATEGIES)
+    config.add_argument('--game-udp-preset', choices=['native', 'alt12-exp'])
     config.add_argument('--exclude-uid', type=int, action='append')
     config.add_argument('--exclude-ip', action='append')
     config.add_argument('--exclude-domain', action='append')
@@ -375,7 +416,10 @@ def main(argv=None):
             else:
                 print('running' if queue_owner() else 'stopped')
         elif args.command in ('start', 'stop', 'restart', 'enable', 'disable'):
-            service(args.command)
+            require_root()
+            from zaper_state import operation
+            with operation():
+                service(args.command)
         else:
             settings = load_settings()
             if args.command == 'show':
@@ -386,7 +430,7 @@ def main(argv=None):
                 supervise(settings)
             elif args.command == 'configure':
                 require_root()
-                for key in ('game', 'ipset', 'strategy'):
+                for key in ('game', 'ipset', 'strategy', 'game_udp_preset'):
                     if getattr(args, key) is not None:
                         setattr(settings, key, getattr(args, key))
                 if args.clear_exclusions:
@@ -398,7 +442,8 @@ def main(argv=None):
                     if values:
                         setattr(settings, 'excluded_' + ('uids' if key == 'uid' else 'ips' if key == 'ip' else 'domains'), values)
                 validate_engine(settings)
-                atomic_save(settings)
+                from zaper_state import save_settings
+                save_settings(settings)
                 print('Настройки проверены и сохранены. Перезапустите службу, чтобы применить их.')
         return 0
     except (ValueError, TypeError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:

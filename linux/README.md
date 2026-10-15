@@ -1,92 +1,109 @@
-# Zapret 2 Manager для Linux — 3.6.3-linux.1 (предварительная версия)
+# Zaper для Linux — 3.8.1-linux.1
 
-Нативное приложение: Python CLI и графический интерфейс Tk, официальный статический **nfqws2 1.0.5.2**, nftables. Один архив для **x86_64 и aarch64/ARM64**. Выбор процессора автоматический; интерфейсы, диски и настройки загрузки не привязаны к компьютеру. Wine не требуется.
+Нативный Linux-порт обновлён вслед за Windows Zaper 3.8.1. Один архив **Zaper-3.8.1-linux.1-universal.tar.gz** для x86_64 и ARM64/aarch64. Python CLI/Tk, официальный статический nfqws2 1.0.5.2, nftables. Это предварительная версия.
+
+## Новое относительно Linux 3.6.3
+
+- Название **Zaper**, тот же значок Z, четыре вкладки и отдельное окно «Настройки запуска и трея».
+- История настроек с откатом, готовые профили «Обычный» / «Игры + Discord», импорт/экспорт JSON. Windows-профили конвертируются; Windows EXE-исключения пропускаются с отчётом. Linux-исключения доменов/IP/UID сохраняются.
+- Все девять стратегий и UDP-профиль `alt12-exp`: 216 комбинаций game/IPSet/strategy/preset на каждой архитектуре. Имя FACEIT не означает подтверждённую совместимость с Anti-Cheat или вход в матч.
+- «Проверить и исправить runtime» использует проверенную встроенную копию. Пользовательские `*-user.txt`, настройки и обновлённый IP-список сохраняются.
+- IP-обновление: HTTPS напрямую и через proxy из окружения, резервный GitHub API, проверка содержимого и откат файла/службы при ошибке применения. Runtime-манифест не изменяется: обновлённый список находится отдельно в `/etc/zapret2-manager/ipset-all.txt`.
+- Редактор Hosts: предпросмотр предложенных записей, сохранение только по кнопке, копия исходника и проверка сторонних изменений. Повторное сохранение и несохранённые правки поддерживаются.
+- ZIP диагностики с маскированием секретов и домашних путей; журнал доступен в пределах прав пользователя. График ICMP-задержки и трафика выбирает сетевой интерфейс по текущему маршруту.
+- Необязательный трей: запуск скрытым, восстановление окна, включение/выключение и выход. При отсутствии поддерживаемого трея окно остаётся видимым. Все операции выполняются вне Tk-потока.
 
 ## Требования
 
-Linux с NFQUEUE/nftables, Python **3.10+**; Tk для GUI. Для кнопок с правами администратора нужны polkit (`pkexec`) и агент авторизации рабочего окружения. systemd необязателен: без него доступен запуск в терминале. CLI не зависит от сторонних модулей Python. Root нужен только для установки, настроек и управления пакетами.
+Linux с NFQUEUE/nftables, Python **3.10+**. Tk — для GUI; curl — для загрузки IP/Hosts. Для административных кнопок нужны polkit/pkexec и агент авторизации рабочего окружения. systemd необязателен: без него доступен foreground-запуск. CLI использует только стандартную библиотеку Python.
 
-Примеры зависимостей (приложение само их не устанавливает):
+Примеры зависимостей:
 
 ```sh
 # Arch
-sudo pacman -S python tk nftables polkit
+sudo pacman -S python tk nftables curl polkit iproute2 iputils
 # Debian / Ubuntu
-sudo apt install python3 python3-tk nftables policykit-1
+sudo apt install python3 python3-tk nftables curl policykit-1 iproute2 iputils-ping
 # Fedora
-sudo dnf install python3 python3-tkinter nftables polkit
+sudo dnf install python3 python3-tkinter nftables curl polkit iproute iputils
 ```
 
-## Установка и запуск
+Трей требует **pystray**, Pillow и поддерживаемую панель X11 либо AppIndicator/StatusNotifierWatcher. Пример для Debian/Ubuntu: `sudo apt install python3-pystray`. Для GNOME может потребоваться расширение рабочего окружения. Наличие pystray само по себе не гарантирует поддержку трея; при невозможности проверить доступность приложение оставляет окно открытым. [Документация pystray о Linux backends](https://pystray.readthedocs.io/en/latest/usage.html#supported-backends).
 
-Распакуйте `Zapret2Manager-3.6.3-linux.1-universal.tar.gz` и перейдите в его папку:
+## Установка и обновление
+
+После распаковки перейдите в папку архива:
 
 ```sh
-python3 zapret_manager.py check       # проверка runtime и профиля без изменения сети
+python3 zapret_manager.py check
 sudo ./install.sh install
-zapret2-manager-gui
+zaper-gui
 # CLI с systemd:
-sudo zapret2-manager start
-zapret2-manager status
-sudo zapret2-manager stop
-# Автозапуск включается отдельно:
-sudo zapret2-manager enable
-sudo zapret2-manager disable
-# Без systemd (остановка Ctrl+C):
-sudo zapret2-manager run
+sudo zaper start
+zaper status
+sudo zaper stop
+# Без systemd:
+sudo zaper run                 # остановка Ctrl+C
 ```
 
-Установка не запускает движок автоматически и не включает автозапуск. При обновлении установленная служба останавливается; включите её после проверки новой версии. Настройки хранятся в `/etc/zapret2-manager/settings.json`, код и runtime — в `/opt/zapret2-manager`. При удалении настройки сохраняются:
+Для обновления предыдущей Linux-версии достаточно нового `install.sh install`. Каталог `/opt/zapret2-manager`, служба `zapret2-manager.service`, настройки `/etc/zapret2-manager` и старые команды `zapret2-manager` / `zapret2-manager-gui` сохранены. Добавлены короткие имена `zaper` / `zaper-gui`. Обновление останавливает существующую systemd-службу; после проверки включите её явно. Foreground-процесс нужно завершить перед обновлением.
+
+Установка не запускает перехват и не включает автозапуск автоматически. Настройки панели находятся у текущего пользователя в `$XDG_CONFIG_HOME/zaper/preferences.json` (обычно `~/.config/zaper`). Автозапуск панели — отдельный XDG `.desktop` файл; автозапуск службы — отдельно через systemd. Изменение запуска службы не перезапускает её.
 
 ```sh
+sudo zaper enable
+sudo zaper disable
 sudo ./install.sh uninstall
 ```
 
-Без systemd сначала завершите запущенный foreground-процесс, затем удаляйте приложение.
+Удаление сохраняет системные настройки/историю и пользовательские настройки панели. Отключите автозапуск панели в её настройках перед удалением; установщик от root не удаляет файлы других пользователей.
 
-## Режимы, стратегии, исключения и диагностика
+## CLI
 
 ```sh
-sudo zapret2-manager configure --game udp --ipset loaded --strategy split
-sudo zapret2-manager restart
-zapret2-manager show
-zapret2-manager diagnose
-zapret2-manager probe
-sudo zapret2-manager configure --exclude-ip 192.0.2.0/24 --exclude-ip 2001:db8::/32 --exclude-domain example.org
-sudo zapret2-manager configure --exclude-uid 1001
-sudo zapret2-manager configure --clear-exclusions
+sudo zaper configure --game udp --ipset loaded --strategy host-seq --game-udp-preset alt12-exp
+sudo zaper restart
+sudo zaper configure --exclude-domain example.org --exclude-ip 192.0.2.0/24 --exclude-uid 1001
+sudo zaper configure --clear-exclusions
+zaper profile-export --name 'Мой профиль' > profile.json
+sudo zaper profile-import < profile.json
+sudo zaper preset normal       # либо gaming
+zaper history
+sudo zaper restore НОМЕР_ИЗ_ИСТОРИИ
+sudo zaper repair
+sudo zaper update-ips
+zaper probe
+zaper monitor --target 1.1.1.1
+zaper diagnose
 journalctl -u zapret2-manager -b
 ```
 
-Игры: `off`, `tcp`, `udp`, `all`. IPSet: `none` — только базовые профили, `loaded` — поставляемый IP-список, `any` — любой IP. Игровые профили добавляются только при `loaded` или `any`, как в Windows. TLS-стратегии: исходная (`current`), `split`, `disorder`; настройки проверяет настоящий движок до сохранения. После сохранения нужен перезапуск.
+Сохранение/импорт/откат настроек не перезапускает движок: примените их явно. История включает исключения; каждый откат сначала сохраняет текущую конфигурацию, включая повреждённый JSON. Изменения защищены межпроцессной блокировкой.
 
-Повторяемые `--exclude-*` заменяют список соответствующего типа. Остальные списки сохраняются. Исключения IP/CIDR и доменов применяются ко всем профилям. UID исключает пользователя целиком и помечает его соединения, чтобы обратный трафик тоже проходил мимо движка. GUI содержит редактор этих исключений.
+`hosts-read`, `hosts-preview`, `hosts-save` и `diagnostics-export` — JSON-команды для GUI. Hosts-save получает текст и SHA256 исходного файла через stdin. Они никогда не принимают произвольный системный путь. ZIP возвращается в base64, а GUI записывает выбранный файл с правами обычного пользователя. История/диагностика могут содержать пользовательские домены и IP; перед передачей просмотрите архив.
 
-`probe` проверяет прямой HTTPS к YouTube, его API, Discord Gateway и FACEIT, без системного HTTP proxy. Неуспешная проверка возвращает код 1; HTTP 403 не считается успехом. Доступность голоса Discord, трансляции, матча или Anti-Cheat этим не подтверждается.
+IPSet: `none` — только базовые профили, `loaded` — поставляемый/обновлённый список, `any` — любой IP. Игровые профили добавляются при `loaded` или `any`. Неизвестный игровой UDP фильтруется по IP, без доменных include-фильтров. Повторяемые `--exclude-*` заменяют соответствующий список; остальные сохраняются.
 
-## Сеть и переносимость
+## Переносимость и границы
 
-Приложение создаёт только таблицу `inet zapret2_manager`, очередь **200**, fwmark **0x40000000** для пакетов движка и ct mark **0x20000000** для исключений UID. Эти значения должны быть свободны от конфликтов с другими сетевыми утилитами. Проверка занятой очереди и чужой одноимённой таблицы запрещает запуск с конфликтом.
+Никаких имён сетевых карт, аппаратных драйверов, дисков или boot-настроек. Менеджер создаёт только свою `inet zapret2_manager`, очередь **200**, fwmark **0x40000000** и ct mark **0x20000000** для исключений UID. Эти значения не должны конфликтовать с другими утилитами. Чужие таблицы сохраняются; занятая очередь или чужая одноимённая таблица запрещают запуск.
 
-Никаких `flush ruleset`, изменений Hosts, маршрутов, sysctl, названий сетевых карт или драйверов. Правила охватывают IPv4/IPv6 и только локальные соединения, не режим роутера. Обработка TCP ограничена выбранными портами. Первые UDP-пакеты всех портов передаются движку для распознавания STUN/Discord; модификация определяется профилями. Лимит первых 12 пакетов соединения работает, когда conntrack accounting включён системой; без него больше пакетов попадёт в очередь. Приложение не меняет этот глобальный sysctl.
+Работа с локальными IPv4/IPv6 соединениями, не режим роутера. Первые UDP-пакеты всех портов передаются движку для распознавания STUN/Discord, модификация определяется профилем. Лимит первых 12 пакетов зависит от включённого системой conntrack accounting; приложение не меняет этот sysctl. Existing VPN/drop/flowtable offload могут влиять на результат.
 
-Очередь использует bypass: при отсутствии движка пакеты не блокируются. При остановке, ошибке правил или сбое движка удаляется собственная таблица. После SIGKILL или отключения питания собственные оставшиеся правила очищаются при следующем запуске. Чужие таблицы сохраняются. Существующие VPN, правила drop и аппаратный/flowtable offload могут влиять на результат: приложение не переписывает их.
+Queue bypass сохраняет передачу при отсутствии движка. При штатной остановке/ошибке/сбое собственная таблица удаляется; после SIGKILL или отключения питания оставшаяся собственная таблица очищается при следующем старте.
 
-## Отличия от Windows
-
-Это первый Linux-порт, а не полная копия Windows UI. Вместо WinDivert и SCM используются NFQUEUE и необязательная systemd-служба. Исключения отдельных EXE заменены доменами/IP/UID: автоматически сопоставлять Windows EXE с Linux-процессами нельзя. Пока не перенесены автоподбор с восстановлением стратегии, ограничитель загрузки proxy, автоматическое обновление списков/Hosts и экспериментальный FACEIT UDP preset. FACEIT Anti-Cheat не переносится этим приложением. Доступность конкретных сервисов у конкретного провайдера требует проверки в его сети.
+Это не полная копия Windows. По-прежнему не перенесены auto-tune с rollback и proxy upload limiter. Обновление приложения выполняется вручную из релиза, без сохранения GitHub-токенов. EXE-иконки и Windows Task Scheduler/SCM заменены Linux-подходами: IP/домены/UID, XDG и необязательная systemd-служба. Пробы не подтверждают голос/трансляцию Discord, реальный FACEIT-матч, Anti-Cheat или работу у конкретного провайдера.
 
 ## Сборка и проверки
 
-Для сборки архива нужен Python 3.12+ (само установленное приложение поддерживает Python 3.10+). Из корня репозитория:
+Для упаковки — Python 3.12+, для установленного приложения — Python 3.10+:
 
 ```sh
 python3 scripts/package-linux.py
-python3 -m unittest discover -s dist/Zapret2Manager-3.6.3-linux.1/tests -p test_manager.py -v
-xvfb-run -a python3 dist/Zapret2Manager-3.6.3-linux.1/zapret_gui.py --smoke-test
-python3 scripts/test-arm64.py dist/Zapret2Manager-3.6.3-linux.1
-# Только в отдельном namespace, не в основной сети:
-sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zapret2Manager-3.6.3-linux.1/tests/integration.py'
+python3 -m unittest discover -s dist/Zaper-3.8.1-linux.1/tests -p 'test_*.py' -v
+xvfb-run -a python3 dist/Zaper-3.8.1-linux.1/tests/gui_smoke.py
+python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.1
+sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zaper-3.8.1-linux.1/tests/integration.py'
 ```
 
-Упаковка проверяет фиксированный SHA256 всего upstream-архива и обоих движков. Архив содержит лицензии, манифест runtime и соответствующие исходники zapret2 с ссылками на происхождение. GitHub Actions проверяет Windows и Linux независимо и выдаёт архивы только после успешных тестов.
+Тест установки/обновления выполняйте только в одноразовом контейнере/VM. GitHub Actions проверяет предыдущий архив Linux, strict umask, реальные пакеты и трей. ARM64 проверяется под QEMU; отдельная ARM-машина и полноценная загрузка systemd не моделируются. Контейнеры используют ядро хоста. Архив содержит лицензии, исходники движка, контрольные суммы и копию восстановления.
