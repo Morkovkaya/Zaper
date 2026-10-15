@@ -34,6 +34,6 @@ Files: new linux/zaper_proxy.py, zapret_gui.py, zaper_commands.py, tests/test_pr
 
 ### Task 4: Delivery
 Files: linux/README.md, version/workflow/tests/installer, docs/VALIDATION.md.
-- [ ] Update GUI smoke and CI for new functions and regression cases; package 3.8.1-linux.2 and test legacy migrations.
-- [ ] Run full Linux/Windows CI, download only successful build artifacts and verify archive checksum after publishing.
-- [ ] Update PR description, merge after required checks, verify main build and publish final Linux release from the same verified source. Document runtime capability limits without claiming provider-specific connectivity.
+- [x] Update GUI smoke and CI for new functions and regression cases; package 3.8.1-linux.2 and test legacy migrations.
+- [x] Run full Linux/Windows CI, download only successful build artifacts and verify archive checksum after publishing.
+- [x] Update PR description, merge after required checks, verify main build and publish final Linux release from the same verified source. Document runtime capability limits without claiming provider-specific connectivity.

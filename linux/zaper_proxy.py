@@ -312,4 +312,3 @@ if __name__=='__main__':
         elif sys.argv[1]=='watch': watch(int(sys.argv[2]),sys.argv[3])
     except Exception as exc:
         print('Ошибка: '+str(exc),file=sys.stderr); sys.exit(1)
-
