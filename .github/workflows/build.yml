@@ -57,7 +57,7 @@ jobs:
       - name: Real X11 tray lifecycle
         run: |
           cd dist/Zaper-3.8.1-linux.1
-          PYSTRAY_BACKEND=xorg xvfb-run -a sh -c 'trayer --edge top --align right --widthtype request --height 28 & task_tray_pid=$!; sleep 1; python3 tests/gui_smoke.py --tray; task_status=$?; kill "$task_tray_pid"; exit "$task_status"'
+          PYSTRAY_BACKEND=xorg xvfb-run -a sh -c 'trayer --edge top --align right --widthtype request --height 28 & task_tray_pid=$!; sleep 1; timeout 45 python3 tests/gui_smoke.py --tray; task_status=$?; kill "$task_tray_pid"; exit "$task_status"'
       - name: ARM64 real engine profile checks
         run: python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.1
       - name: Isolated real packet lifecycle

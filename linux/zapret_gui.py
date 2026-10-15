@@ -106,7 +106,7 @@ class App:
         for label, command in (('Проверить и исправить runtime', 'repair'), ('Обновить IP-список', 'update-ips')):
             self.button(maintenance, label, lambda cmd=command: self.run([cmd], True)).pack(anchor='w', pady=7)
         self.button(maintenance, 'Редактор системного Hosts', self.hosts_dialog).pack(anchor='w', pady=7)
-        self.button(maintenance, 'Релизы / обновление приложения', lambda: webbrowser.open('https://github.com/ivanmorkovka1-ux/zaper2/releases')).pack(anchor='w', pady=7)
+        self.button(maintenance, 'Релизы / обновление приложения', lambda: webbrowser.open('https://github.com/Morkovkaya/Zaper/releases')).pack(anchor='w', pady=7)
         self.button(maintenance, 'О приложении', self.about).pack(anchor='w', pady=7)
         ttk.Label(main, text='Журнал операций').pack(anchor='w', pady=(0, 4))
         self.log = tk.Text(main, height=6, bg='#0c1220', fg='#cbd7f0', wrap='word', state='disabled')
@@ -165,6 +165,12 @@ class App:
                 break
             if event[0] == 'action':
                 self.tray_action(event[1]); continue
+            if event[0] == 'tray-failed':
+                if self.tray: self.tray.stop()
+                self.tray = None
+                self.root.deiconify()
+                if event[2]: self.write('Трей недоступен — окно оставлено видимым: ' + event[1])
+                continue
             if event[0] == 'tray-ready':
                 if event[1]: self.root.withdraw()
                 continue
@@ -306,7 +312,7 @@ class App:
     def setup_tray(self, hide=False):
         try:
             from zaper_tray import Tray
-            self.tray = Tray(lambda action: self.events.put(('action', action)), HOME / 'zaper.png', lambda: self.events.put(('tray-ready', hide)))
+            self.tray = Tray(lambda action: self.events.put(('action', action)), HOME / 'zaper.png', lambda: self.events.put(('tray-ready', hide)), lambda error: self.events.put(('tray-failed', error, hide)))
         except Exception as exc:
             if hide: self.write('Трей недоступен — окно оставлено видимым: ' + str(exc))
 
@@ -318,7 +324,7 @@ class App:
     def close(self):
         if self.busy:
             self.write('Дождитесь завершения операции; панель остаётся доступной')
-        elif self.tray:
+        elif self.tray and self.tray.ready:
             self.root.withdraw()
         else:
             self.quit()

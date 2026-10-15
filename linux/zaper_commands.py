@@ -71,7 +71,7 @@ def run(argv):
             result = maintenance.monitor_sample(args.target)
         elif command == 'app-updates':
             # A private repository requires browser authentication. Do not persist tokens.
-            result = {'installed': zm.VERSION, 'url': 'https://github.com/ivanmorkovka1-ux/zaper2/releases',
+            result = {'installed': zm.VERSION, 'url': 'https://github.com/Morkovkaya/Zaper/releases',
                       'note': 'Выберите Linux-релиз; распакуйте и запустите install.sh install. Служба и настройки сохраняются.'}
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0

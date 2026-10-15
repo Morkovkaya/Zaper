@@ -84,3 +84,4 @@ try:
 finally:
     app.busy = False
     app.quit()
+    if app.tray: assert app.tray.process.poll() is not None

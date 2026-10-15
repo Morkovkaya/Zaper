@@ -29,7 +29,16 @@ Copy-Item "$app\Zapret2Service.exe" "$repair\app" -Force
 Copy-Item "$payload\runtime-sha256.json" $repair -Force
 $archive=Join-Path $app 'repair-runtime.zip'
 if(Test-Path -LiteralPath $archive){Remove-Item -LiteralPath $archive}
-[IO.Compression.ZipFile]::CreateFromDirectory($repair,$archive,[IO.Compression.CompressionLevel]::Optimal,$false)
+# ZIP entry names use '/', independently of the build host and .NET Framework.
+# Convenience.Repair resolves manifest keys with these standard ZIP separators.
+Add-Type -AssemblyName System.IO.Compression
+$zip=[IO.Compression.ZipFile]::Open($archive,[IO.Compression.ZipArchiveMode]::Create)
+try {
+ foreach($file in Get-ChildItem -LiteralPath $repair -File -Recurse){
+  $relative=$file.FullName.Substring($repair.Length+1).Replace('\','/')
+  [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,$file.FullName,$relative,[IO.Compression.CompressionLevel]::Optimal) | Out-Null
+ }
+} finally { $zip.Dispose() }
 if(!$SkipInstaller){
  if(!$InnoCompiler){$found=Get-Command ISCC.exe -ErrorAction SilentlyContinue;if($found){$InnoCompiler=$found.Source}}
  if(!$InnoCompiler -or !(Test-Path $InnoCompiler)){throw 'Specify -InnoCompiler with the path to ISCC.exe, or use -SkipInstaller.'}
