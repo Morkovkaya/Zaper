@@ -14,12 +14,19 @@ class Tray:
         self.process = subprocess.Popen(['/usr/bin/python3', '-I', str(Path(__file__).resolve()), '--helper', str(image)],
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                         text=True, bufsize=1)
+        def startup_timeout():
+            if not self.ready and not self.stopping and on_error:
+                on_error('Трей не подтвердил готовность; окно остаётся доступным')
+        self.timer = threading.Timer(5, startup_timeout)
+        self.timer.daemon = True
+        self.timer.start()
         def messages():
             try:
                 for line in self.process.stdout:
                     event = json.loads(line)
                     if event['kind'] == 'ready':
                         self.ready = True
+                        self.timer.cancel()
                         on_ready()
                     elif event['kind'] == 'action':
                         dispatch(event['value'])
@@ -29,11 +36,13 @@ class Tray:
                 pass
             finally:
                 self.ready = False
+                self.timer.cancel()
                 if not self.stopping and on_error: on_error('Процесс трея завершился; окно восстановлено')
         threading.Thread(target=messages, daemon=True).start()
 
     def stop(self):
         self.stopping = True
+        self.timer.cancel()
         if self.process.poll() is None:
             self.process.terminate()
             try: self.process.wait(timeout=2)
@@ -59,6 +68,10 @@ def helper(image):
     try:
         import pystray
         from PIL import Image
+        # Ubuntu 24.04 ships pystray 0.19.4, which uses Pillow's removed alias.
+        # Isolate the compatibility alias in the tray helper, not the GUI process.
+        if not hasattr(Image, 'ANTIALIAS'):
+            Image.ANTIALIAS = Image.Resampling.LANCZOS
         module = pystray.Icon.__module__
         if module.endswith('_xorg'):
             from Xlib.display import Display
@@ -82,8 +95,12 @@ def helper(image):
             pystray.MenuItem('Выключить', lambda icon, item: emit('action', 'stop')),
             pystray.MenuItem('Выход из панели', lambda icon, item: emit('action', 'quit'))))
         def ready(icon):
-            icon.visible = True
-            emit('ready')
+            try:
+                icon.visible = True
+                emit('ready')
+            except Exception as exc:
+                emit('error', str(exc))
+                icon.stop()
         def requests():
             for line in sys.stdin:
                 try:
