@@ -1,0 +1,27 @@
+[Unit]
+Description=Zapret 2 Manager native Linux engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=15
+ExecStart=/usr/bin/python3 -I /opt/zapret2-manager/zapret_manager.py run
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+KillMode=mixed
+UMask=0022
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/zapret2-manager /etc/zapret2-manager /var/lib/zapret2-manager
+StateDirectory=zapret2-manager
+ConfigurationDirectory=zapret2-manager
+RuntimeDirectory=zapret2-manager
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SETUID CAP_SETGID CAP_SETPCAP CAP_KILL
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

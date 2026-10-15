@@ -1,0 +1,99 @@
+name: Build and verify
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      windows_ref:
+        description: 'Optional Windows release commit/tag; ordinary CI checks the current commit'
+        required: false
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.windows_ref || github.sha }}
+          path: windows-source
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: powershell
+        run: ./windows-source/build.ps1 -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+      - name: Verify application and installer
+        shell: powershell
+        run: ./scripts/test-windows.ps1 -SourceRoot windows-source
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-evidence
+          path: windows-source/build/evidence/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: windows-source/dist/*.exe
+          if-no-files-found: error
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package pinned universal runtime
+        run: python3 scripts/package-linux.py
+      - name: Install test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y python3-tk xvfb nftables qemu-user curl openssl python3-pystray trayer gsettings-desktop-schemas libglib2.0-bin dconf-cli dbus-x11 libkf5config-bin
+      - name: Unit tests and all engine configurations
+        run: python3 -m unittest discover -s dist/Zaper-3.8.1-linux.2/tests -p 'test_*.py' -v
+      - name: GUI smoke test
+        run: xvfb-run -a python3 dist/Zaper-3.8.1-linux.2/tests/gui_smoke.py
+      - name: Real X11 tray lifecycle
+        run: |
+          cd dist/Zaper-3.8.1-linux.2
+          PYSTRAY_BACKEND=xorg xvfb-run -a sh -c 'trayer --edge top --align right --widthtype request --height 28 & task_tray_pid=$!; sleep 1; timeout 45 python3 tests/gui_smoke.py --tray; task_status=$?; kill "$task_tray_pid"; exit "$task_status"'
+      - name: ARM64 real engine profile checks
+        run: python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.2
+      - name: Isolated real packet lifecycle
+        run: |
+          cp -R dist/Zaper-3.8.1-linux.2 /tmp/zapret2-ci
+          sudo unshare --net sh -c 'ip link set lo up; setpriv --bounding-set=-all,+net_admin,+net_raw,+setuid,+setgid,+setpcap,+kill --no-new-privs env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
+      - name: Real engine auto-tune and rollback (isolated network)
+        run: sudo unshare --net sh -c 'ip link set lo up; env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/tune_integration.py'
+      - name: SIGKILL tuner watchdog recovery (disposable runner)
+        run: sudo env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/tune_watchdog.py
+      - name: GNOME and KDE proxy recovery (isolated desktop session)
+        run: |
+          task_desktop_root=$(mktemp -d /tmp/zaper-desktop.XXXXXX)
+          env ZAPER_ISOLATED_DESKTOP=1 XDG_CONFIG_HOME="$task_desktop_root/config" XDG_STATE_HOME="$task_desktop_root/state" dbus-run-session -- python3 dist/Zaper-3.8.1-linux.2/tests/proxy_desktop.py
+      - name: Staged install and uninstall
+        run: |
+          cd dist/Zaper-3.8.1-linux.2
+          DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh install
+          test -x "$RUNNER_TEMP/zapret-stage/usr/local/bin/zapret2-manager"
+          DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh uninstall
+          test ! -e "$RUNNER_TEMP/zapret-stage/opt/zapret2-manager"
+      - name: Download legacy Linux release for upgrade test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v3.6.3-linux.1 -R "$GITHUB_REPOSITORY" -p Zapret2Manager-3.6.3-linux.1-universal.tar.gz -D "$RUNNER_TEMP/legacy"
+      - name: Real legacy upgrade and repair (disposable runner)
+        run: sudo /tmp/zapret2-ci/tests/upgrade.sh "$RUNNER_TEMP/legacy/Zapret2Manager-3.6.3-linux.1-universal.tar.gz" /tmp/zapret2-ci
+      - name: Download previous 3.8.1 Linux release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v3.8.1-linux.1 -R "$GITHUB_REPOSITORY" -p Zaper-3.8.1-linux.1-universal.tar.gz -D "$RUNNER_TEMP/legacy-381"
+      - name: Upgrade from previous 3.8.1 Linux release
+        run: sudo /tmp/zapret2-ci/tests/upgrade.sh "$RUNNER_TEMP/legacy-381/Zaper-3.8.1-linux.1-universal.tar.gz" /tmp/zapret2-ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-universal
+          path: dist/*-universal.tar.gz
+          if-no-files-found: error
