@@ -65,7 +65,11 @@ try:
     assert beats
     if '--tray' in sys.argv:
         app.setup_tray(True)
-        wait(root, lambda: app.tray is not None and root.state() == 'withdrawn', timeout=8)
+        try:
+            wait(root, lambda: app.tray is not None and root.state() == 'withdrawn', timeout=8)
+        except AssertionError:
+            print(app.log.get('1.0', 'end'), flush=True)
+            raise
         app.tray_action('show')
         root.update()
         assert root.state() == 'normal'

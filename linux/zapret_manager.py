@@ -421,7 +421,7 @@ def main(argv=None):
             with operation():
                 service(args.command)
         else:
-            settings = load_settings()
+            settings = None if args.command == 'configure' else load_settings()
             if args.command == 'show':
                 print(json.dumps(dataclasses.asdict(settings), ensure_ascii=False, indent=2))
             elif args.command == 'check':
@@ -430,20 +430,21 @@ def main(argv=None):
                 supervise(settings)
             elif args.command == 'configure':
                 require_root()
-                for key in ('game', 'ipset', 'strategy', 'game_udp_preset'):
-                    if getattr(args, key) is not None:
-                        setattr(settings, key, getattr(args, key))
-                if args.clear_exclusions:
-                    settings.excluded_uids = []
-                    settings.excluded_ips = []
-                    settings.excluded_domains = []
-                for key in ('uid', 'ip', 'domain'):
-                    values = getattr(args, 'exclude_' + key)
-                    if values:
-                        setattr(settings, 'excluded_' + ('uids' if key == 'uid' else 'ips' if key == 'ip' else 'domains'), values)
-                validate_engine(settings)
+                def changed(settings):
+                    for key in ('game', 'ipset', 'strategy', 'game_udp_preset'):
+                        if getattr(args, key) is not None:
+                            setattr(settings, key, getattr(args, key))
+                    if args.clear_exclusions:
+                        settings.excluded_uids = []
+                        settings.excluded_ips = []
+                        settings.excluded_domains = []
+                    for key in ('uid', 'ip', 'domain'):
+                        values = getattr(args, 'exclude_' + key)
+                        if values:
+                            setattr(settings, 'excluded_' + ('uids' if key == 'uid' else 'ips' if key == 'ip' else 'domains'), values)
+                    return settings
                 from zaper_state import save_settings
-                save_settings(settings)
+                save_settings(changed)
                 print('Настройки проверены и сохранены. Перезапустите службу, чтобы применить их.')
         return 0
     except (ValueError, TypeError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:

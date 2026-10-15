@@ -49,6 +49,15 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(zm.load_settings().game, 'tcp')
         self.assertTrue(any('raw_settings_base64' in x.read_text() for x in (state.STATE / 'history').glob('*.json')))
 
+    def test_partial_settings_change_reads_current_state_under_lock(self):
+        state.save_settings(zm.Settings(excluded_domains=['preserve.example.org']))
+        def changed(current):
+            current.game = 'udp'
+            return current
+        state.save_settings(changed)
+        self.assertEqual(zm.load_settings().excluded_domains, ['preserve.example.org'])
+        self.assertEqual(zm.load_settings().game, 'udp')
+
     def test_invalid_history_identity_cannot_escape_directory(self):
         for identity in ('../../etc/passwd', '/etc/hosts', 'x.json'):
             with self.assertRaises(ValueError): state.restore(identity)

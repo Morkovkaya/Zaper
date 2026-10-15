@@ -246,15 +246,15 @@ def diagnostics_zip():
     return output.getvalue()
 
 
-def default_interface():
-    result = backend().checked(['ip', '-j', 'route', 'get', '1.1.1.1'])
+def default_interface(target='1.1.1.1'):
+    result = backend().checked(['ip', '-j', 'route', 'get', target])
     rows = json.loads(result)
     return rows[0].get('dev', '') if rows else ''
 
 
 def monitor_sample(target='1.1.1.1'):
     ipaddress.ip_address(target)
-    interface = default_interface()
+    interface = default_interface(target)
     if not re.fullmatch(r'[A-Za-z0-9_.:-]+', interface):
         raise ValueError('Не удалось определить интерфейс интернет-маршрута')
     stats = Path('/sys/class/net') / interface / 'statistics'

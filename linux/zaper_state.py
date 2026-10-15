@@ -66,8 +66,9 @@ def snapshot(reason):
 
 def save_settings(settings, reason='configure'):
     zm = backend()
-    settings.validate()
     with operation():
+        if callable(settings): settings = settings(zm.load_settings())
+        settings.validate()
         zm.validate_engine(settings)
         identity = snapshot(reason)
         zm.atomic_save(settings, zm.CONFIG)
