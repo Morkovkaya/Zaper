@@ -2,6 +2,8 @@
 [Setup]
 AppId={code:InstallerAppId}
 AppName=Zaper
+; Keep installer recognition compatible with the 3.7/3.8 update dialogs.
+VersionInfoProductName=Zapret 2 Manager
 AppVersion=3.8.1
 AppPublisher=Zapret 2 Manager Community
 DefaultDirName={commonappdata}\zapret2
