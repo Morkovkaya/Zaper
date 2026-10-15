@@ -16,6 +16,7 @@ public static class UiRegression {
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Настроить FACEIT")||b.Text=="График задержки"),"no duplicate FACEIT shortcut or separate graph launcher");
    check(All(form).OfType<LatencyPanel>().Count()==1,"graph embedded directly in diagnostics");
    check(await form.NetworkGraph.TestLocal(),"embedded diagnostics graph plots real loopback samples");
+   check(await ParallelDownload(),"UI stays responsive while direct download cancels stalled proxy route");
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Обновить Hosts"))&&All(form).OfType<Button>().Any(b=>b.Text=="Hosts"),"Hosts editor entry replaces misleading update button");
    using(var servers=new FaceForm()){var buttons=All(servers).OfType<Button>().ToArray();check(buttons.Length==1&&buttons[0].Text=="Проверить","server window has only the requested check action");}
    using(var preferences=new PreferencesForm(()=>{})){check(!All(preferences).OfType<Label>().Any(l=>l.Text.Contains("Крестик")),"tray settings omit redundant close hint");check(All(preferences).OfType<CheckBox>().Count()==3,"tray options retained with descriptions");}
@@ -27,6 +28,14 @@ public static class UiRegression {
    Tests.Preview(form);Tests.PreviewExclusions();check(File.ReadAllText(Path.Combine(directory,"layout-test.txt")).Contains("Failures: 0"),"all pages fit default and minimum sizes");
   }catch(Exception ex){check(false,ex.ToString());}finally{form.ExitApp();check(form.IsDisposed&&form.TrayReleased,"explicit exit closes form and removes tray icon");File.AppendAllText(Path.Combine(directory,"tray-test.txt"),Environment.NewLine+(form.IsDisposed&&form.TrayReleased?"PASS":"FAIL")+": explicit exit closes form and removes tray icon");report.Add("Failures: "+failures);File.WriteAllLines(Path.Combine(directory,"ui-test.txt"),report);}};
   Application.Run(form);return Task.FromResult(failures==0?0:1);
+ }
+ static async Task<bool> ParallelDownload(){
+  var direct=new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback,0);var proxy=new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback,0);direct.Start();proxy.Start();int beats=0;
+  using(var timer=new System.Windows.Forms.Timer {Interval=25}){timer.Tick+=(s,e)=>beats++;timer.Start();try{
+   var good=Task.Run(async()=>{using(var peer=await direct.AcceptTcpClientAsync()){var stream=peer.GetStream();var buffer=new byte[4096];await stream.ReadAsync(buffer,0,buffer.Length);await Task.Delay(150);byte[] data=System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 11\r\nConnection: close\r\n\r\n1.2.3.0/24\n");await stream.WriteAsync(data,0,data.Length);}});
+   var slow=Task.Run(async()=>{using(var peer=await proxy.AcceptTcpClientAsync()){await Task.Delay(1000);}});
+   string value=await Downloads.FetchRoutes("http://127.0.0.1:"+((System.Net.IPEndPoint)direct.LocalEndpoint).Port+"/list",new[]{null,"127.0.0.1:"+((System.Net.IPEndPoint)proxy.LocalEndpoint).Port},System.Threading.CancellationToken.None);await Task.WhenAll(good,slow);return Core.ValidateIPSet(value)==1&&beats>0;
+  }finally{timer.Stop();direct.Stop();proxy.Stop();}}
  }
 }
 }

@@ -9,10 +9,14 @@ using System.Threading.Tasks;
 namespace ZapretManager {
 public static class Downloads {
  public static async Task<string> Fetch(string url,CancellationToken token){
-  using(var stop=CancellationTokenSource.CreateLinkedTokenSource(token)){
    var modes=new List<string>{null};string proxy=Core.Proxy();
    if(!string.IsNullOrWhiteSpace(proxy)){if(proxy.Contains("=")){var match=System.Text.RegularExpressions.Regex.Match(proxy,@"(?:^|;)https?=([^;]+)");proxy=match.Success?match.Groups[1].Value:"";}if(proxy!="")modes.Add(proxy);}
-   var pending=modes.Select(p=>FetchRoute(url,p,stop.Token)).ToList();var errors=new List<Exception>();
+   return await FetchRoutes(url,modes,token);
+ }
+ internal static async Task<string> FetchRoutes(string url,IEnumerable<string> modes,CancellationToken token){
+  using(var stop=CancellationTokenSource.CreateLinkedTokenSource(token)){
+   // Each route runs off the UI thread, including its subprocess cleanup on cancellation.
+   var pending=modes.Select(p=>Task.Run(()=>FetchRoute(url,p,stop.Token))).ToList();var errors=new List<Exception>();
    try{while(pending.Count>0){token.ThrowIfCancellationRequested();var done=await Task.WhenAny(pending);pending.Remove(done);try{return await done;}catch(OperationCanceledException){token.ThrowIfCancellationRequested();}catch(Exception e){errors.Add(e);}}throw new IOException("Не удалось загрузить данные напрямую и через доступный proxy. Текущие файлы сохранены.",errors.LastOrDefault());}
    finally{stop.Cancel();foreach(var job in pending)try{job.GetAwaiter().GetResult();}catch{}}
   }
