@@ -10,7 +10,7 @@ New-Item -ItemType Directory $app -Force | Out-Null
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if(!(Test-Path $compiler)){throw 'The .NET Framework x64 C# compiler is required.'}
 $sources=@(Get-ChildItem "$root\src" -Filter '*.cs' | ForEach-Object {$_.FullName})
-& $compiler /nologo /nowarn:4014,0108,1998 /target:winexe /platform:x64 /optimize+ ("/out:$app\Zapret2Manager.exe") /reference:System.Windows.Forms.dll,System.Drawing.dll,System.ServiceProcess.dll,System.Web.Extensions.dll,System.IO.Compression.dll,System.IO.Compression.FileSystem.dll,System.Security.dll,Microsoft.CSharp.dll,System.Net.Http.dll,System.Windows.Forms.DataVisualization.dll $sources
+& $compiler /nologo /nowarn:4014,0108,1998 /target:winexe /platform:x64 /optimize+ ("/out:$app\Zapret2Manager.exe") ("/win32icon:$root\assets\zaper.ico") /reference:System.Windows.Forms.dll,System.Drawing.dll,System.ServiceProcess.dll,System.Web.Extensions.dll,System.IO.Compression.dll,System.IO.Compression.FileSystem.dll,System.Security.dll,Microsoft.CSharp.dll,System.Net.Http.dll,System.Windows.Forms.DataVisualization.dll $sources
 if($LASTEXITCODE){throw 'C# compilation failed'}
 Copy-Item "$app\Zapret2Manager.exe" "$app\Zapret2Service.exe" -Force
 Copy-Item "$root\src\*.cs" $app -Force
@@ -38,4 +38,4 @@ if(!$SkipInstaller){
  if($LASTEXITCODE){throw 'Installer compilation failed'}
 }
 Write-Output "Application: $app\Zapret2Manager.exe"
-if(!$SkipInstaller){Write-Output "Installer: $root\dist\Zapret2Manager-Setup-3.7.0-x64.exe"}
+if(!$SkipInstaller){Write-Output "Installer: $root\dist\Zapret2Manager-Setup-3.8.0-x64.exe"}

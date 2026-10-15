@@ -1,8 +1,8 @@
 #define Payload "..\build\payload"
 [Setup]
 AppId={code:InstallerAppId}
-AppName=Zapret 2 Manager
-AppVersion=3.7.0
+AppName=zaper
+AppVersion=3.8.0
 AppPublisher=Zapret 2 Manager Community
 DefaultDirName={commonappdata}\zapret2
 DisableDirPage=yes
@@ -12,14 +12,14 @@ UsePreviousGroup=no
 UsePreviousTasks=no
 UsePreviousUserInfo=no
 UsePreviousSetupType=no
-DefaultGroupName=Zapret 2 Manager
+DefaultGroupName=zaper
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0
 OutputDir=..\dist
-OutputBaseFilename=Zapret2Manager-Setup-3.7.0-x64
+OutputBaseFilename=Zapret2Manager-Setup-3.8.0-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -29,11 +29,12 @@ UninstallDisplayIcon={app}\app\Zapret2Manager.exe
 UninstallFilesDir={app}\uninstall
 InfoBeforeFile=install-info.txt
 SetupLogging=yes
+SetupIconFile=..\assets\zaper.ico
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
-Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"
+Name: "desktopicon"; Description: "Создать ярлык zaper на рабочем столе"
 Name: "service"; Description: "Установить и включить службу zapret 2 с автозапуском Windows"
 [Files]
 Source: "{#Payload}\app\*"; DestDir: "{app}\app"; Excludes: "tests,tests\*"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -49,12 +50,14 @@ Source: "{#Payload}\lua\*"; DestDir: "{app}\lua"; Flags: ignoreversion recursesu
 Source: "{#Payload}\http3\*"; DestDir: "{app}\http3"; Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\windivert.filter\*"; DestDir: "{app}\windivert.filter"; Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 Source: "{#Payload}\app\Zapret2Manager.exe"; DestName: "SetupRepair.exe"; Flags: dontcopy
+[InstallDelete]
+Type: files; Name: "{autodesktop}\Управление zapret 2.lnk"; Check: Not TestMode
 [Icons]
-Name: "{group}\Zapret 2 Manager"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Check: Not TestMode
-Name: "{group}\Удалить Zapret 2 Manager"; Filename: "{uninstallexe}"; Check: Not TestMode
-Name: "{autodesktop}\Управление zapret 2"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Tasks: desktopicon; Check: Not TestMode
+Name: "{group}\zaper"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Check: Not TestMode
+Name: "{group}\Удалить zaper"; Filename: "{uninstallexe}"; Check: Not TestMode
+Name: "{autodesktop}\zaper"; Filename: "{app}\app\Zapret2Manager.exe"; WorkingDir: "{app}\app"; Tasks: desktopicon; Check: Not TestMode
 [Run]
-Filename: "{app}\app\Zapret2Manager.exe"; Description: "Открыть Zapret 2 Manager"; Flags: postinstall nowait skipifsilent runascurrentuser; Check: Not TestMode
+Filename: "{app}\app\Zapret2Manager.exe"; Description: "Открыть zaper"; Flags: postinstall nowait skipifsilent runascurrentuser; Check: Not TestMode
 [Code]
 function InstallerAppId(Param: String): String;
 begin
