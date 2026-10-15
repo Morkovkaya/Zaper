@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import tempfile
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import webbrowser
@@ -78,22 +79,56 @@ class App:
             ttk.Label(settings, text=label).grid(row=n, column=0, sticky='w', pady=7)
             ttk.Combobox(settings, textvariable=variable, values=values, state='readonly').grid(row=n, column=1, sticky='ew', padx=12)
         settings.columnconfigure(1, weight=1)
-        ttk.Label(settings, text='Игровой режим работает при IPSet loaded/any. Сохранение не перезапускает движок.').grid(row=4, column=0, columnspan=2, sticky='w', pady=10)
+        ttk.Label(settings, text='Игровой режим работает при IPSet loaded/any. Применение сохраняет прежнее состояние службы; ошибка возвращает настройки.').grid(row=4, column=0, columnspan=2, sticky='w', pady=10)
         self.button(settings, 'Сохранить и проверить', self.save).grid(row=5, column=0, sticky='w', pady=7)
         self.button(settings, 'Исключения доменов / IP / UID', self.exclusions).grid(row=5, column=1, sticky='w')
         self.button(settings, 'Настройки запуска и трея', self.launch_dialog).grid(row=6, column=0, columnspan=2, sticky='w', pady=7)
+        self.discord_fake=tk.StringVar(value='ACTIVE_DISCORD_UDP.bin')
+        self.game_fake=tk.StringVar(value='ACTIVE_GAME_UDP.bin')
+        self.auto_check=tk.BooleanVar(value=False)
+        self.faceit_exclusions=tk.BooleanVar(value=True)
+        self.fake_boxes=[]
+        for n,(label,var) in enumerate((('UDP-пакет Discord',self.discord_fake),('UDP-пакет игр',self.game_fake)),7):
+            ttk.Label(settings,text=label).grid(row=n,column=0,sticky='w',pady=5)
+            box=ttk.Combobox(settings,textvariable=var,values=[var.get()],state='readonly')
+            box.grid(row=n,column=1,sticky='ew',padx=12);self.fake_boxes.append(box)
+        ttk.Checkbutton(settings,text='Проверять сеть после сохранения',variable=self.auto_check).grid(row=9,column=0,sticky='w',pady=5)
+        ttk.Checkbutton(settings,text='Исключать выбранные серверы FACEIT из UDP',variable=self.faceit_exclusions).grid(row=9,column=1,sticky='w')
         profiles = self.page('Профили и история')
         for label, action in (
-                ('Обычный профиль', lambda: self.run(['preset', 'normal'], True, after=self.refresh)),
-                ('Игры + Discord', lambda: self.run(['preset', 'gaming'], True, after=self.refresh)),
+                ('Обычный профиль', lambda: self.run(['preset', 'normal', '--apply'], True, after=self.refresh)),
+                ('Игры + Discord', lambda: self.run(['preset', 'gaming', '--apply'], True, after=self.refresh)),
                 ('Экспорт JSON-профиля', self.export_profile), ('Импорт JSON-профиля', self.import_profile),
                 ('История настроек / откат', self.history_dialog)):
             self.button(profiles, label, action).pack(anchor='w', pady=7)
-        ttk.Label(profiles, text='Каждое сохранение создаёт запись истории. После отката или импорта нужен перезапуск.\nWindows-профили конвертируются; EXE-исключения пропускаются с отчётом.').pack(anchor='w', pady=12)
+        ttk.Label(profiles, text='Каждое сохранение создаёт запись истории. Активная служба перезапускается при применении.\nWindows-профили конвертируются; EXE-исключения пропускаются с отчётом.').pack(anchor='w', pady=12)
+        tuning=self.page('Подбор и прокси')
+        ttk.Label(tuning,text='Автоподбор проверяет 9 стратегий и повторно проверяет финалистов.\nПри ошибке или отмене возвращаются настройки и прежнее состояние службы.').pack(anchor='w',pady=8)
+        row=ttk.Frame(tuning);row.pack(fill='x')
+        self.button(row,'Начать подбор',lambda:self.run(['autotune'],True,after=self.refresh)).pack(side='left',padx=(0,6))
+        ttk.Button(row,text='Отменить подбор',command=lambda:self.run(['tune-cancel'],True,background=True)).pack(side='left')
+        self.progress=tk.DoubleVar(value=0)
+        ttk.Progressbar(tuning,variable=self.progress,maximum=100).pack(fill='x',pady=10)
+        row=ttk.Frame(tuning);row.pack(fill='x')
+        self.button(row,'Вернуть предыдущую',lambda:self.run(['tune-recover'],True,after=self.refresh)).pack(side='left',padx=(0,6))
+        self.button(row,'Результаты подбора',lambda:self.run(['tune-results'],after=lambda output:self.result_dialog('Результаты подбора',output),quiet=True)).pack(side='left')
+        ttk.Separator(tuning).pack(fill='x',pady=16)
+        ttk.Label(tuning,text='Ограничитель исходящего трафика через HTTP/SOCKS-прокси на 127.0.0.1.\nВ ручном режиме укажите 127.0.0.1:10819 в приложении; GNOME/KDE переключаются автоматически.').pack(anchor='w')
+        self.rate=tk.IntVar(value=17);self.upstream=tk.IntVar(value=10809);self.proxy_desktop=tk.StringVar(value='manual')
+        row=ttk.Frame(tuning);row.pack(fill='x',pady=10)
+        for label,var in (('Мбит/с',self.rate),('Порт исходного прокси',self.upstream)):
+            ttk.Label(row,text=label).pack(side='left',padx=5);ttk.Entry(row,textvariable=var,width=8).pack(side='left')
+        ttk.Combobox(row,textvariable=self.proxy_desktop,values=('manual','gnome','kde'),state='readonly',width=10).pack(side='left',padx=8)
+        row=ttk.Frame(tuning);row.pack(fill='x')
+        self.button(row,'Включить лимит',self.proxy_start).pack(side='left',padx=(0,6))
+        self.button(row,'Выключить / восстановить',lambda:self.run(['proxy-stop'])).pack(side='left',padx=(0,6))
+        self.button(row,'Состояние',lambda:self.run(['proxy-status'])).pack(side='left')
         diagnostics = self.page('Диагностика')
-        for label, command in (('Проверить конфигурацию', 'check'), ('Соединения сервисов (HTTPS)', 'probe'),
+        self.diagnostics_page=diagnostics
+        for label, command in (('Проверить конфигурацию', 'check'), ('Сеть: HTTPS / HTTP3 / STUN', 'measure'),
                                ('Проверить зависимости', 'diagnose')):
             self.button(diagnostics, label, lambda cmd=command: self.run([cmd])).pack(anchor='w', pady=5)
+        self.button(diagnostics, 'Соединения FACEIT / сервер CS2', self.faceit_dialog).pack(anchor='w', pady=5)
         self.button(diagnostics, 'Экспорт ZIP диагностики', self.export_diagnostics).pack(anchor='w', pady=5)
         self.target = tk.StringVar(value='1.1.1.1')
         row = ttk.Frame(diagnostics); row.pack(fill='x', pady=6)
@@ -106,17 +141,19 @@ class App:
         for label, command in (('Проверить и исправить runtime', 'repair'), ('Обновить IP-список', 'update-ips')):
             self.button(maintenance, label, lambda cmd=command: self.run([cmd], True)).pack(anchor='w', pady=7)
         self.button(maintenance, 'Редактор системного Hosts', self.hosts_dialog).pack(anchor='w', pady=7)
-        self.button(maintenance, 'Релизы / обновление приложения', lambda: webbrowser.open('https://github.com/Morkovkaya/Zaper/releases')).pack(anchor='w', pady=7)
+        self.button(maintenance, 'Релизы / обновление приложения', self.update_dialog).pack(anchor='w', pady=7)
         self.button(maintenance, 'О приложении', self.about).pack(anchor='w', pady=7)
         ttk.Label(main, text='Журнал операций').pack(anchor='w', pady=(0, 4))
         self.log = tk.Text(main, height=6, bg='#0c1220', fg='#cbd7f0', wrap='word', state='disabled')
         self.log.pack(fill='x')
         root.protocol('WM_DELETE_WINDOW', self.close)
         self.refresh()
+        root.after(500, lambda:self.run(['fake-list'],quiet=True,after=self.loaded_fakes))
         root.after(80, self.poll)
         if not smoke:
             root.after(200, lambda: self.setup_tray(start_in_tray or self.preferences.start_in_tray))
         root.after(3000, self.refresh_status)
+        if not smoke:root.after(4000,self.chart_tick)
 
     def page(self, title):
         page = ttk.Frame(self.tabs, padding=14)
@@ -149,7 +186,26 @@ class App:
                     command = ['pkexec', str(INSTALLED)] + args
                 else:
                     command = ['/usr/bin/python3', '-I', str(LOCAL)] + args
-                result = subprocess.run(command, input=payload, capture_output=True, text=True, timeout=120)
+                if args[0]=='autotune':
+                    with tempfile.TemporaryFile(mode='w+') as error:
+                        process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=error,text=True)
+                        output=[]
+                        try:
+                            for line in process.stdout:
+                                try:
+                                    progress=json.loads(line)
+                                    if isinstance(progress,dict) and 'progress' in progress:
+                                        self.events.put(('progress',progress));continue
+                                except ValueError: pass
+                                output.append(line)
+                            process.wait()
+                        finally:
+                            process.stdout.close()
+                            if process.poll() is None: process.terminate();process.wait(timeout=10)
+                        error.seek(0)
+                        result=subprocess.CompletedProcess(command,process.returncode,''.join(output),error.read())
+                else:
+                    result = subprocess.run(command, input=payload, capture_output=True, text=True, timeout=300 if args[0]=='app-download' else 120)
                 self.events.put(('result', result.returncode, result.stdout + result.stderr, after, quiet, background))
             except Exception as exc:
                 self.events.put(('result', 1, str(exc), None, False, background))
@@ -163,6 +219,8 @@ class App:
                 event = self.events.get_nowait()
             except queue.Empty:
                 break
+            if event[0]=='progress':
+                self.progress.set(event[1]['progress']);self.write(event[1]['message']);continue
             if event[0] == 'action':
                 self.tray_action(event[1]); continue
             if event[0] == 'tray-failed':
@@ -195,7 +253,7 @@ class App:
 
     def loaded(self, output):
         self.settings_data = json.loads(output)
-        for key, variable in (('game', self.game), ('ipset', self.ipset), ('strategy', self.strategy), ('game_udp_preset', self.udp)):
+        for key, variable in (('game', self.game), ('ipset', self.ipset), ('strategy', self.strategy), ('game_udp_preset', self.udp), ('discord_fake',self.discord_fake), ('game_fake',self.game_fake), ('auto_check',self.auto_check), ('faceit_server_exclusions',self.faceit_exclusions)):
             variable.set(self.settings_data.get(key, 'native'))
 
     def refresh_status(self):
@@ -207,7 +265,7 @@ class App:
         self.root.after(3000, self.refresh_status)
 
     def save(self):
-        self.run(['configure', '--game', self.game.get(), '--ipset', self.ipset.get(), '--strategy', self.strategy.get(), '--game-udp-preset', self.udp.get()], True)
+        self.run(['configure', '--apply', '--game', self.game.get(), '--ipset', self.ipset.get(), '--strategy', self.strategy.get(), '--game-udp-preset', self.udp.get(), '--discord-fake',self.discord_fake.get(),'--game-fake',self.game_fake.get(),'--auto-check','yes' if self.auto_check.get() else 'no','--faceit-server-exclusions','yes' if self.faceit_exclusions.get() else 'no'], True)
 
     def exclusions(self):
         def opened(output):
@@ -228,6 +286,49 @@ class App:
             ttk.Button(dialog, text='Сохранить', command=save).grid(row=3, column=0, columnspan=2, pady=12)
         self.run(['show'], after=opened, quiet=True)
 
+    def update_dialog(self):
+        dialog=tk.Toplevel(self.root);dialog.title('Zaper — обновление приложения');dialog.geometry('760x260')
+        ttk.Label(dialog,text='Для приватного GitHub нужен токен Contents:read. Он используется только в этом окне.\nЗагрузка проверяет SHA256 из GitHub; установка сохраняет настройки.').pack(padx=12,pady=12)
+        token=tk.StringVar();entry=ttk.Entry(dialog,textvariable=token,show='*',width=65);entry.pack(padx=12)
+        details=tk.StringVar(value='Установлено: '+VERSION);ttk.Label(dialog,textvariable=details,wraplength=720).pack(padx=12,pady=12)
+        row=ttk.Frame(dialog);row.pack()
+        def checked(output):
+            data=json.loads(output)
+            if dialog.winfo_exists():details.set(data['tag']+'; SHA256 '+data['sha256'][:16]+'…')
+        self.button(row,'Проверить релиз',lambda:self.run(['app-updates'],payload=json.dumps({'token':token.get()}),after=checked,quiet=True)).pack(side='left',padx=4)
+        def download():
+            directory=filedialog.askdirectory()
+            if directory:self.run(['app-download','--directory',directory],payload=json.dumps({'token':token.get()}),after=lambda output:self.result_dialog('Проверенный архив',output),quiet=True)
+        self.button(row,'Скачать с проверкой SHA256',download).pack(side='left',padx=4)
+        ttk.Button(row,text='Открыть Releases',command=lambda:webbrowser.open('https://github.com/Morkovkaya/Zaper/releases')).pack(side='left',padx=4)
+        def closed(event):
+            if event.widget==dialog:
+                token.set('');self.buttons[:]=[b for b in self.buttons if b.winfo_exists()]
+        dialog.bind('<Destroy>',closed)
+
+    def loaded_fakes(self, output):
+        for box in self.fake_boxes: box.configure(values=json.loads(output))
+
+    def result_dialog(self, title, output):
+        dialog=tk.Toplevel(self.root);dialog.title('Zaper — '+title);dialog.geometry('900x580')
+        text=tk.Text(dialog,wrap='word');text.pack(fill='both',expand=True)
+        text.insert('1.0',output);text.configure(state='disabled')
+
+    def proxy_start(self):
+        try:
+            self.run(['proxy-start','--rate',str(self.rate.get()),'--upstream',str(self.upstream.get()),'--desktop',self.proxy_desktop.get()])
+        except (ValueError,tk.TclError) as exc: self.write('Ошибка: '+str(exc))
+
+    def faceit_dialog(self):
+        dialog=tk.Toplevel(self.root);dialog.title('Zaper — FACEIT / CS2');dialog.geometry('700x200')
+        ttk.Label(dialog,text='Сервер CS2 IPv4:порт (необязательно для диагностики)').pack(pady=10)
+        server=tk.StringVar();ttk.Entry(dialog,textvariable=server,width=40).pack()
+        row=ttk.Frame(dialog);row.pack(pady=12)
+        self.button(row,'Проверить',lambda:self.run(['faceit','--server',server.get()],after=lambda output:self.result_dialog('Соединения серверов',output),quiet=True)).pack(side='left',padx=4)
+        self.button(row,'Исключить из UDP',lambda:self.run(['faceit-exclude','--server',server.get(),'--apply'],True,after=self.refresh)).pack(side='left',padx=4)
+        self.button(row,'Вернуть обработку',lambda:self.run(['faceit-exclude','--server',server.get(),'--remove','--apply'],True,after=self.refresh)).pack(side='left',padx=4)
+        dialog.bind('<Destroy>',lambda event:self.buttons.__setitem__(slice(None),[b for b in self.buttons if b.winfo_exists()]) if event.widget==dialog else None)
+
     def export_profile(self):
         path = filedialog.asksaveasfilename(defaultextension='.json', filetypes=[('JSON', '*.json')])
         if path:
@@ -238,7 +339,7 @@ class App:
         if path:
             try:
                 if Path(path).stat().st_size > 1024 * 1024: raise ValueError('Профиль больше 1 МиБ')
-                self.run(['profile-import'], True, payload=Path(path).read_text(), after=self.refresh)
+                self.run(['profile-import','--apply'], True, payload=Path(path).read_text(), after=self.refresh)
             except Exception as exc: self.write('Ошибка: ' + str(exc))
 
     def history_dialog(self):
@@ -251,7 +352,7 @@ class App:
             def restore():
                 selection = listing.curselection()
                 if selection:
-                    self.run(['restore', rows[selection[0]]['id']], True, after=self.refresh)
+                    self.run(['restore', rows[selection[0]]['id'],'--apply'], True, after=self.refresh)
                     dialog.destroy()
             ttk.Button(dialog, text='Вернуть выбранные настройки', command=restore).pack(pady=12)
         self.run(['history'], after=opened, quiet=True)
@@ -282,6 +383,12 @@ class App:
             self.button(row, 'Сохранить', save).pack(side='left', padx=6)
             dialog.bind('<Destroy>', lambda event: self.buttons.__setitem__(slice(None), [b for b in self.buttons if b.winfo_exists()]) if event.widget == dialog else None)
         self.run(['hosts-read'], after=opened, quiet=True)
+
+    def chart_tick(self):
+        if self.closed:return
+        if not self.busy and self.tabs.select()==str(self.diagnostics_page):
+            self.run(['monitor','--target',self.target.get()],after=self.draw_sample,quiet=True,background=True)
+        self.root.after(4000,self.chart_tick)
 
     def draw_sample(self, output):
         data = json.loads(output); self.samples.append(data); self.samples = self.samples[-25:]

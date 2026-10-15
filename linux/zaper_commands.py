@@ -8,7 +8,8 @@ from pathlib import Path
 import sys
 
 COMMANDS = {'history', 'restore', 'profile-export', 'profile-import', 'preset', 'repair', 'update-ips',
-            'hosts-read', 'hosts-preview', 'hosts-save', 'diagnostics-export', 'monitor', 'app-updates'}
+            'hosts-read', 'hosts-preview', 'hosts-save', 'diagnostics-export', 'monitor', 'app-updates', 'measure', 'faceit', 'faceit-exclude', 'autotune', 'tune-cancel', 'tune-recover', 'tune-results',
+            'proxy-start', 'proxy-stop', 'proxy-status', 'proxy-recover', 'fake-list', 'app-download'}
 
 
 def run(argv):
@@ -27,16 +28,65 @@ def run(argv):
         parser.add_argument('--name', default='Мой профиль')
     elif command == 'monitor':
         parser.add_argument('--target', default='1.1.1.1')
+    elif command in ('faceit', 'faceit-exclude'):
+        parser.add_argument('--server', default='', required=command=='faceit-exclude')
+        if command=='faceit-exclude': parser.add_argument('--remove', action='store_true')
+    elif command=='app-download':
+        parser.add_argument('--directory',required=True)
+    elif command=='proxy-start':
+        parser.add_argument('--rate',type=int,default=17)
+        parser.add_argument('--port',type=int,default=10819)
+        parser.add_argument('--upstream',type=int,default=10809)
+        parser.add_argument('--desktop',choices=['manual','gnome','kde'],default='manual')
+    if command in ('restore','preset','profile-import','faceit-exclude'):parser.add_argument('--apply',action='store_true')
     args = parser.parse_args(argv[1:])
     try:
-        if command in ('restore', 'profile-import', 'preset', 'repair', 'update-ips', 'hosts-save'):
+        if command in ('restore', 'profile-import', 'preset', 'repair', 'update-ips', 'hosts-save', 'autotune', 'tune-cancel', 'tune-recover', 'faceit-exclude'):
             zm.require_root()
-        if command == 'history':
+        if command.startswith('proxy-'):
+            import zaper_proxy as proxy
+            if command=='proxy-start': result=proxy.start(args.rate,args.port,args.upstream,args.desktop)
+            elif command=='proxy-stop': result=proxy.stop()
+            elif command=='proxy-recover': result=proxy.recover()
+            else: result=proxy.status()
+        elif command in ('autotune','tune-cancel','tune-recover','tune-results','measure','faceit','faceit-exclude'):
+            import zaper_network as network
+            import zaper_tune as tune
+            import threading, signal, os
+            event=threading.Event()
+            previous={sig:signal.signal(sig,lambda *a:event.set()) for sig in (signal.SIGTERM,signal.SIGINT)}
+            try:
+                if command=='autotune':
+                    def progress(percent,message):
+                        print(json.dumps({'progress':percent,'message':message},ensure_ascii=False),flush=True)
+                    result=tune.tune(event,progress)
+                elif command=='tune-cancel': result=tune.cancel()
+                elif command=='tune-recover': result=tune.recover(force=True)
+                elif command=='tune-results': result=json.loads(tune.results_path().read_text()) if tune.results_path().exists() else []
+                elif command=='measure': result=network.measure(2,event)
+                elif command=='faceit': result=network.faceit(args.server,event,os.environ.get('https_proxy') or os.environ.get('http_proxy'))
+                else:
+                    address,_=network.parse_server(args.server)
+                    def changed(settings):
+                        settings.faceit_servers=[x for x in settings.faceit_servers if x!=address]
+                        if not args.remove: settings.faceit_servers.append(address)
+                        settings.faceit_server_exclusions=True
+                        return settings
+                    result={'backup':state.save_settings(changed,'faceit-server-exclusion',apply=args.apply),'restart_required':True}
+                if command in ('measure','faceit'):
+                    # Diagnostics are unprivileged; exported data belongs to this user.
+                    from zaper_proxy import home
+                    state.atomic_bytes(home().parent/(command+'-results.json'),json.dumps(result,ensure_ascii=False).encode(),0o600)
+            finally:
+                for sig,handler in previous.items(): signal.signal(sig,handler)
+        elif command=='fake-list':
+            result=sorted(p.name for p in (zm.RUNTIME/'files').glob('*.bin'))
+        elif command == 'history':
             result = state.history()
         elif command == 'restore':
-            result = {'backup_before_restore': state.restore(args.identity), 'restart_required': True}
+            result = {'backup_before_restore': state.restore(args.identity,apply=args.apply), 'restart_required': not args.apply}
         elif command == 'preset':
-            result = {'backup': state.save_settings(state.preset(args.name), 'preset:' + args.name), 'restart_required': True}
+            result = {'backup': state.save_settings(lambda old:state.preset(args.name,old), 'preset:' + args.name,apply=args.apply), 'restart_required': not args.apply}
         elif command == 'profile-export':
             result = state.profile(zm.load_settings(), args.name)
         elif command in ('profile-import', 'hosts-save'):
@@ -46,7 +96,7 @@ def run(argv):
             data = json.loads(raw.lstrip('\ufeff'))
             if command == 'profile-import':
                 settings, skipped = state.import_profile(data)
-                result = {'backup': state.save_settings(settings, 'import-profile'), 'skipped_windows_exe': skipped, 'restart_required': True}
+                result = {'backup': state.save_settings(settings, 'import-profile',apply=args.apply), 'skipped_windows_exe': skipped, 'restart_required': not args.apply}
             else:
                 result = {'backup': maintenance.save_hosts(data['text'], data['sha256'])}
         elif command == 'repair':
@@ -69,10 +119,14 @@ def run(argv):
             result = {'zip_base64': base64.b64encode(maintenance.diagnostics_zip()).decode()}
         elif command == 'monitor':
             result = maintenance.monitor_sample(args.target)
-        elif command == 'app-updates':
-            # A private repository requires browser authentication. Do not persist tokens.
-            result = {'installed': zm.VERSION, 'url': 'https://github.com/Morkovkaya/Zaper/releases',
-                      'note': 'Выберите Linux-релиз; распакуйте и запустите install.sh install. Служба и настройки сохраняются.'}
+        elif command in ('app-updates','app-download'):
+            import zaper_updates as updates
+            raw=sys.stdin.read(8193) if not sys.stdin.isatty() else ''
+            if len(raw)>8192: raise ValueError('Слишком длинный запрос обновления')
+            token=json.loads(raw).get('token','') if raw.strip() else ''
+            if not isinstance(token,str): raise ValueError('Некорректный токен')
+            result=updates.check(token) if command=='app-updates' else updates.download(args.directory,token)
+            result['installed']=zm.VERSION
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, TypeError, KeyError, RuntimeError, __import__('subprocess').SubprocessError) as exc:

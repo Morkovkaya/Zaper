@@ -21,4 +21,9 @@ for game in ('off', 'tcp', 'udp', 'all'):
                 if result.returncode:
                     raise SystemExit(result.stdout + result.stderr)
                 count += 1
+for fake in (home/'runtime/files').glob('*.bin'):
+    settings=manager.Settings(game='all',ipset='loaded',discord_fake=fake.name,game_fake=fake.name,faceit_servers=['192.0.2.5'])
+    result=subprocess.run(['qemu-aarch64',str(home/'runtime/bin/arm64/nfqws2'),'--dry-run']+manager.build_args(settings),capture_output=True,text=True,timeout=30)
+    if result.returncode:raise SystemExit(result.stdout+result.stderr)
+print('PASS: all bundled UDP fake files and FACEIT server exclusions on ARM64')
 print(f'PASS: all {count} ARM64 profiles accepted by the real engine')

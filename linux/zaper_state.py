@@ -37,7 +37,7 @@ def atomic_bytes(path, content, mode=0o644):
 
 
 @contextmanager
-def operation():
+def operation(allow_pending=False):
     STATE.mkdir(parents=True, exist_ok=True)
     STATE.chmod(0o755)
     with (STATE / 'operation.lock').open('a') as stream:
@@ -45,6 +45,8 @@ def operation():
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise RuntimeError('Дождитесь завершения другой операции Zaper') from None
+        if not allow_pending and (STATE/'tune-pending.json').exists():
+            raise RuntimeError('Незавершённый автоподбор: выполните sudo zaper tune-recover')
         yield
 
 
@@ -64,14 +66,29 @@ def snapshot(reason):
     return identity
 
 
-def save_settings(settings, reason='configure'):
+def save_settings(settings, reason='configure', apply=False):
     zm = backend()
     with operation():
         if callable(settings): settings = settings(zm.load_settings())
         settings.validate()
         zm.validate_engine(settings)
         identity = snapshot(reason)
-        zm.atomic_save(settings, zm.CONFIG)
+        if apply:
+            import zaper_maintenance as maintenance
+            active=maintenance.service_active()
+            if zm.queue_owner() is not None and not active:
+                raise RuntimeError('Остановите foreground-движок перед применением')
+            original=zm.CONFIG.read_bytes() if zm.CONFIG.exists() else None
+            if active: zm.service('stop')
+            try:
+                zm.atomic_save(settings,zm.CONFIG)
+                if active:zm.service('start')
+            except BaseException:
+                if original is None:zm.CONFIG.unlink(missing_ok=True)
+                else:atomic_bytes(zm.CONFIG,original)
+                if active:zm.service('start')
+                raise
+        else:zm.atomic_save(settings, zm.CONFIG)
     return identity
 
 
@@ -87,12 +104,12 @@ def history():
     return rows
 
 
-def restore(identity):
+def restore(identity, apply=False):
     if not re.fullmatch(r'\d{8}T\d{6}-[a-f0-9]{10}', identity):
         raise ValueError('Недопустимый номер записи истории')
     data = json.loads((STATE / 'history' / (identity + '.json')).read_text())
     settings = backend().Settings(**data['settings']).validate()
-    return save_settings(settings, 'restore:' + identity)
+    return save_settings(settings, 'restore:' + identity,apply=apply)
 
 
 def profile(settings, name='Мой профиль'):
@@ -113,7 +130,11 @@ def import_profile(value):
             raise ValueError('Некорректный Windows-профиль')
         settings = zm.Settings(game=source.get('Game', 'off'), ipset=source.get('IPSet', 'none'),
                                strategy=source.get('StrategyId', 'current'),
-                               game_udp_preset=source.get('GameUdpPreset', 'native'))
+                               game_udp_preset=source.get('GameUdpPreset', 'native'),
+                               discord_fake=source.get('DiscordFake', 'ACTIVE_DISCORD_UDP.bin'),
+                               game_fake=source.get('GameFake', 'ACTIVE_GAME_UDP.bin'),
+                               auto_check=source.get('AutoCheck', False),
+                               faceit_server_exclusions=source.get('FaceitServerExclusions', True))
         apps = value.get('Applications') or []
         if not isinstance(apps, list) or any(not isinstance(x, str) for x in apps):
             raise ValueError('Некорректный список EXE')
@@ -126,9 +147,9 @@ def import_profile(value):
     return settings, skipped
 
 
-def preset(name):
+def preset(name, settings=None):
     zm = backend()
-    settings = zm.load_settings()
+    settings = settings or zm.load_settings()
     if name not in ('normal', 'gaming'):
         raise ValueError('Неизвестный готовый профиль')
     settings.game = 'udp' if name == 'gaming' else 'off'

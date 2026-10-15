@@ -70,6 +70,19 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(zm.load_settings(), original)
         self.assertEqual(len(state.history()), 2)
 
+    def test_apply_restarts_only_active_service_and_rolls_back_failed_start(self):
+        before=zm.Settings(game='tcp',excluded_domains=['keep.example'])
+        state.save_settings(before);raw=zm.CONFIG.read_bytes()
+        actions=[]
+        def service(action):
+            actions.append(action)
+            if action=='start' and len(actions)==2:raise RuntimeError('new engine failed')
+        with patch.object(maintenance,'service_active',return_value=True),patch.object(zm,'queue_owner',return_value=123),patch.object(zm,'service',side_effect=service):
+            with self.assertRaisesRegex(RuntimeError,'new engine'):state.save_settings(zm.Settings(game='all'),apply=True)
+        self.assertEqual(zm.CONFIG.read_bytes(),raw);self.assertEqual(actions,['stop','start','start'])
+        with patch.object(maintenance,'service_active',return_value=False),patch.object(zm,'queue_owner',return_value=None),patch.object(zm,'service') as service:
+            state.save_settings(zm.Settings(game='all'),apply=True);service.assert_not_called()
+
     def test_invalid_profile_does_not_write_or_create_history(self):
         value = state.profile(zm.Settings())
         value['settings']['game'] = 'invalid'
@@ -191,6 +204,17 @@ class PackagedTests(unittest.TestCase):
                     for ipset in ('none', 'loaded', 'any'):
                         with self.subTest(strategy=strategy, preset=preset, game=game, ipset=ipset):
                             zm.validate_engine(zm.Settings(strategy=strategy, game_udp_preset=preset, game=game, ipset=ipset))
+
+    def test_all_fake_files_and_faceit_exclusions_are_accepted(self):
+        for fake in (zm.RUNTIME/'files').glob('*.bin'):
+            for enabled in (False,True):
+                settings=zm.Settings(game='all',ipset='loaded',discord_fake=fake.name,game_fake=fake.name,
+                                     faceit_servers=['192.0.2.5'],faceit_server_exclusions=enabled)
+                zm.validate_engine(settings)
+                args=zm.build_args(settings)
+                self.assertEqual(any('192.0.2.5' in x for x in args),enabled)
+        for fake in ('../bad.bin','/tmp/bad.bin','not-here.bin'):
+            with self.assertRaises(ValueError):zm.validate_engine(zm.Settings(game_fake=fake))
 
     def test_runtime_backup_restores_corrupt_file_without_losing_user_lists(self):
         import shutil

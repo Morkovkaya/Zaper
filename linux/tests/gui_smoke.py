@@ -28,7 +28,7 @@ app = App(root, smoke=True)
 try:
     wait(root, lambda: not app.busy)
     assert root.title().startswith('Zaper') and '2 Manager' not in root.title()
-    assert len(app.tabs.tabs()) == 4
+    assert len(app.tabs.tabs()) == 5
     for tab in app.tabs.tabs():
         app.tabs.select(tab)
         root.update()
@@ -37,6 +37,9 @@ try:
     dialogs = [x for x in root.winfo_children() if isinstance(x, tk.Toplevel)]
     assert len(dialogs) == 1
     dialogs[0].destroy()
+    app.faceit_dialog()
+    root.update()
+    next(x for x in root.winfo_children() if isinstance(x,tk.Toplevel)).destroy()
     app.launch_dialog()
     root.update()
     dialog = next(x for x in root.winfo_children() if isinstance(x, tk.Toplevel))

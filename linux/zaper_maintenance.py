@@ -29,27 +29,46 @@ MAX_DOWNLOAD = 4 * 1024 * 1024
 
 
 def download(url, timeout=18):
-    """Direct route then environment proxy, with total curl timeout and size bound."""
+    """Race direct and proxy routes; cancel and reap the losing curl process."""
     if not url.startswith('https://'):
         raise ValueError('Загрузка разрешена только по HTTPS')
-    errors = []
-    # curl also supports HTTPS/SOCKS system environment proxies without storing credentials.
-    for direct in (True, False):
-        command = ['curl', '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
-                   '--silent', '--show-error', '--connect-timeout', '5', '--max-time', str(timeout),
-                   '--max-filesize', str(MAX_DOWNLOAD), '--user-agent', 'Zaper/' + VERSION]
-        if direct:
-            command += ['--noproxy', '*']
-        try:
-            result = subprocess.run(command + [url], capture_output=True, timeout=timeout + 3)
-            if result.returncode == 0 and 0 < len(result.stdout) <= MAX_DOWNLOAD:
-                return result.stdout.decode('utf-8-sig')
-            errors.append(f'curl exit {result.returncode}')
-        except subprocess.TimeoutExpired:
-            errors.append('timeout')
-        except FileNotFoundError:
-            raise RuntimeError('Для загрузки установите curl') from None
-    raise RuntimeError('Источник недоступен напрямую и через proxy; прежние файлы сохранены (' + ', '.join(errors) + ')')
+    import concurrent.futures
+    import threading
+    import tempfile
+    import time
+    stop=threading.Event()
+    def route(direct):
+        command=['curl','--fail','--location','--proto','=https','--proto-redir','=https',
+                 '--silent','--show-error','--connect-timeout','5','--max-time',str(timeout),
+                 '--max-filesize',str(MAX_DOWNLOAD),'--user-agent','Zaper/'+VERSION]
+        if direct:command+=['--noproxy','*']
+        with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
+            process=subprocess.Popen(command+[url],stdout=output,stderr=errors)
+            try:
+                deadline=time.monotonic()+timeout+3
+                while process.poll() is None:
+                    if stop.wait(.04):raise RuntimeError('Другой маршрут завершён')
+                    if time.monotonic()>deadline:raise RuntimeError('Истекло время загрузки')
+                output.seek(0);data=output.read(MAX_DOWNLOAD+1)
+                if process.returncode or not 0<len(data)<=MAX_DOWNLOAD:raise RuntimeError('curl exit '+str(process.returncode))
+                return data.decode('utf-8-sig')
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    try:process.wait(timeout=1)
+                    except subprocess.TimeoutExpired:process.kill();process.wait()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            futures=[pool.submit(route,direct) for direct in (True,False)]
+            errors=[]
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    try:return future.result()
+                    except (RuntimeError,UnicodeError) as exc:errors.append(str(exc))
+                raise RuntimeError('Источник недоступен напрямую и через proxy; прежние файлы сохранены ('+', '.join(errors)+')')
+            finally:stop.set()
+    except FileNotFoundError:
+        raise RuntimeError('Для загрузки установите curl') from None
 
 
 def validate_ipset(text):

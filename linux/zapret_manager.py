@@ -37,6 +37,11 @@ class Settings:
     ipset: str = 'none'
     strategy: str = 'current'
     game_udp_preset: str = 'native'
+    discord_fake: str = 'ACTIVE_DISCORD_UDP.bin'
+    game_fake: str = 'ACTIVE_GAME_UDP.bin'
+    auto_check: bool = False
+    faceit_server_exclusions: bool = True
+    faceit_servers: list = dataclasses.field(default_factory=list)
     excluded_uids: list = dataclasses.field(default_factory=list)
     excluded_ips: list = dataclasses.field(default_factory=list)
     excluded_domains: list = dataclasses.field(default_factory=list)
@@ -50,6 +55,15 @@ class Settings:
             raise ValueError('Неизвестная стратегия')
         if self.game_udp_preset not in ('native', 'alt12-exp'):
             raise ValueError('Неизвестный игровой UDP-профиль')
+        import re
+        for fake in (self.discord_fake, self.game_fake):
+            if not isinstance(fake, str) or not re.fullmatch(r'[A-Za-z0-9_.-]+\.bin', fake) or fake.startswith('.'):
+                raise ValueError('Недопустимое имя UDP-пакета')
+        if type(self.auto_check) is not bool or type(self.faceit_server_exclusions) is not bool:
+            raise ValueError('Ожидаются логические параметры')
+        if not isinstance(self.faceit_servers, list) or len(self.faceit_servers)>10000:
+            raise ValueError('Некорректный список серверов FACEIT')
+        for address in self.faceit_servers: ipaddress.IPv4Address(address)
         if any(not isinstance(x, list) or len(x) > 10000 for x in (self.excluded_ips, self.excluded_domains, self.excluded_uids)):
             raise ValueError('Исключения должны быть списками ограниченного размера')
         if len(self.excluded_uids) > 128 or any(type(x) is not int or not 0 <= x < 2**32 for x in self.excluded_uids):
@@ -116,6 +130,9 @@ def build_args(settings, runtime=None):
     settings.validate()
     text = (runtime / 'manager-base.template').read_text()
     text = text.replace('%ROOT%\\', str(runtime) + '/').replace('\\', '/')
+    for fake in (settings.discord_fake, settings.game_fake):
+        if not (runtime/'files'/fake).is_file(): raise ValueError('Файл UDP-пакета отсутствует: '+fake)
+    text = text.replace('/files/ACTIVE_DISCORD_UDP.bin', '/files/'+settings.discord_fake)
     args = [x for x in shlex.split(text) if not x.startswith('--wf-')]
     args[:0] = [f'--qnum={QUEUE}', f'--fwmark={MARK}']
     for blob in ('quic_google', 'discord_udp'):
@@ -161,7 +178,7 @@ def build_args(settings, runtime=None):
                 '--lua-desync=fake:blob=tls_max:tcp_ts=-600000:tcp_ts_up:repeats=8:payload=all',
                 '--lua-desync=multisplit:pos=1:seqovl=664:seqovl_pattern=tls_max:tcp_ts_up:payload=all']
         if settings.game in ('udp', 'all'):
-            args.insert(2, f'--blob=game_udp:@{runtime}/files/ACTIVE_GAME_UDP.bin')
+            args.insert(2, f'--blob=game_udp:@{runtime}/files/{settings.game_fake}')
             args += ['--new', '--filter-udp=1024-65535'] + scope + ip_exclude + [
                 '--out-range=-n4', '--payload=all',
                 '--lua-desync=fake:blob=quic_google:repeats=5:payload=all',
@@ -183,6 +200,13 @@ def build_args(settings, runtime=None):
         global_ex.append('--ipset-exclude-ip=' + ','.join(settings.excluded_ips))
     if settings.excluded_domains:
         global_ex.append('--hostlist-exclude-domains=' + ','.join(settings.excluded_domains))
+    if settings.faceit_server_exclusions and settings.faceit_servers:
+        # A server exclusion applies only to UDP sections, preserving its web traffic.
+        expanded=[]
+        for arg in args:
+            expanded.append(arg)
+            if arg.startswith('--filter-udp='): expanded.append('--ipset-exclude-ip='+','.join(settings.faceit_servers))
+        args=expanded
     result = list(global_ex)
     for arg in args:
         result.append(arg)
@@ -271,6 +295,12 @@ def notify_ready():
 def supervise(settings, runtime=None):
     runtime = RUNTIME if runtime is None else Path(runtime)
     require_root()
+    from zaper_tune import recover_before_engine
+    from zaper_tune import journal, identity
+    pending = json.loads(journal().read_text()) if journal().exists() else None
+    recovered = pending and identity(pending['pid']) != pending['birth']
+    if not recover_before_engine(): return
+    if recovered: settings = load_settings()
     if not shutil.which('nft'):
         raise RuntimeError('Установите nftables')
     validate_engine(settings, runtime)
@@ -328,6 +358,10 @@ def supervise(settings, runtime=None):
 def require_root():
     if os.geteuid() != 0:
         raise RuntimeError('Нужны права администратора: sudo zapret2-manager <команда>')
+
+
+def service_available():
+    return Path('/run/systemd/system').exists()
 
 
 def service(action):
@@ -394,6 +428,11 @@ def main(argv=None):
     config.add_argument('--ipset', choices=['none', 'loaded', 'any'])
     config.add_argument('--strategy', choices=STRATEGIES)
     config.add_argument('--game-udp-preset', choices=['native', 'alt12-exp'])
+    config.add_argument('--apply',action='store_true')
+    config.add_argument('--discord-fake')
+    config.add_argument('--game-fake')
+    config.add_argument('--auto-check', choices=['yes', 'no'])
+    config.add_argument('--faceit-server-exclusions', choices=['yes', 'no'])
     config.add_argument('--exclude-uid', type=int, action='append')
     config.add_argument('--exclude-ip', action='append')
     config.add_argument('--exclude-domain', action='append')
@@ -431,9 +470,11 @@ def main(argv=None):
             elif args.command == 'configure':
                 require_root()
                 def changed(settings):
-                    for key in ('game', 'ipset', 'strategy', 'game_udp_preset'):
+                    for key in ('game', 'ipset', 'strategy', 'game_udp_preset', 'discord_fake', 'game_fake'):
                         if getattr(args, key) is not None:
                             setattr(settings, key, getattr(args, key))
+                    for key in ('auto_check', 'faceit_server_exclusions'):
+                        if getattr(args,key) is not None: setattr(settings,key,getattr(args,key)=='yes')
                     if args.clear_exclusions:
                         settings.excluded_uids = []
                         settings.excluded_ips = []
@@ -444,7 +485,10 @@ def main(argv=None):
                             setattr(settings, 'excluded_' + ('uids' if key == 'uid' else 'ips' if key == 'ip' else 'domains'), values)
                     return settings
                 from zaper_state import save_settings
-                save_settings(changed)
+                save_settings(changed,apply=args.apply)
+                if load_settings().auto_check:
+                    from zaper_network import measure
+                    print(json.dumps(measure(1), ensure_ascii=False))
                 print('Настройки проверены и сохранены. Перезапустите службу, чтобы применить их.')
         return 0
     except (ValueError, TypeError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:

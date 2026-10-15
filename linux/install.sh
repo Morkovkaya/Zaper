@@ -27,6 +27,8 @@ case "$mode" in
         fi
     fi
     mkdir -p "$app" "$(dirname "$cli")" "$(dirname "$unit")" "$stage/usr/share/applications"
+    mkdir -p "$stage/etc/zapret2-manager" "$stage/var/lib/zapret2-manager"
+    chmod 755 "$stage/etc/zapret2-manager" "$stage/var/lib/zapret2-manager"
     cp "$source_dir"/*.py "$source_dir"/runtime-repair.* "$source_dir"/zaper.png "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
     cp "$source_dir"/zapret2-*-source.tar.gz "$app/"
     task_user_lists=$(mktemp -d)
