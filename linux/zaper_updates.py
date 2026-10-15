@@ -27,7 +27,10 @@ def request(url,token='',binary=False):
     if token:
         if not isinstance(token,str) or not re.fullmatch(r'[A-Za-z0-9_]+',token.strip()):raise ValueError('Некорректный формат токена GitHub')
         headers['Authorization']='Bearer '+token.strip()
-    return urllib.request.build_opener(Redirect()).open(urllib.request.Request(url,headers=headers),timeout=30)
+    from zaper_proxy import detected_proxy
+    proxy=detected_proxy()
+    handler=urllib.request.ProxyHandler({'http':proxy,'https':proxy}) if proxy else urllib.request.ProxyHandler()
+    return urllib.request.build_opener(handler,Redirect()).open(urllib.request.Request(url,headers=headers),timeout=30)
 
 
 def select(releases):

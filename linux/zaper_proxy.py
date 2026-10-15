@@ -283,9 +283,33 @@ def stop():
     return recover()
 
 
+
+
+def detected_proxy():
+    """Read the user's proxy without changing it; environment takes precedence."""
+    for key in ('https_proxy','HTTPS_PROXY','http_proxy','HTTP_PROXY','ALL_PROXY','all_proxy'):
+        value=os.environ.get(key,'').strip()
+        if value:return value
+    desktop=os.environ.get('XDG_CURRENT_DESKTOP','').lower()
+    try:
+        if 'gnome' in desktop:
+            values=Gnome().read()
+            if values[0]=="'manual'":
+                host=values[3].strip("'") or values[1].strip("'");port=values[4] if values[3].strip("'") else values[2]
+                if host and port.isdigit() and 1<=int(port)<=65535:return 'http://'+host+':'+port
+        elif 'kde' in desktop or 'plasma' in desktop:
+            values=Kde().read()
+            if values[0]=='1':
+                value=values[2] or values[1]
+                return value.replace(' ',':') if ' ' in value else value
+    except (OSError,RuntimeError,subprocess.SubprocessError):pass
+    return None
+
+
 if __name__=='__main__':
     try:
         if sys.argv[1]=='serve': asyncio.run(serve(int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4]),sys.argv[5]))
         elif sys.argv[1]=='watch': watch(int(sys.argv[2]),sys.argv[3])
     except Exception as exc:
         print('Ошибка: '+str(exc),file=sys.stderr); sys.exit(1)
+

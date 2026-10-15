@@ -12,6 +12,15 @@ if [ -z "$stage" ] && [ "$(id -u)" -ne 0 ]; then
     echo 'Use sudo ./install.sh install (or uninstall)' >&2
     exit 1
 fi
+# Hold the same lock as configure/repair/autotune throughout a real installation.
+# DESTDIR is packaging only and must never touch the host's application state.
+if [ -z "$stage" ]; then
+    mkdir -p /var/lib/zapret2-manager
+    chmod 755 /var/lib/zapret2-manager
+    exec 9>/var/lib/zapret2-manager/operation.lock
+    flock -n 9 || { echo 'Another Zaper operation is active; wait before installing/removing' >&2; exit 1; }
+    test ! -f /var/lib/zapret2-manager/tune-pending.json || { echo 'Recover interrupted tuning first: sudo zaper tune-recover' >&2; exit 1; }
+fi
 case "$mode" in
  install)
     test -f "$source_dir/runtime/sha256.json" || { echo 'Download a complete release archive first' >&2; exit 1; }

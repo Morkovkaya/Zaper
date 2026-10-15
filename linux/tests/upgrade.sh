@@ -16,6 +16,10 @@ printf '%s\n' 'custom.example.org' > /opt/zapret2-manager/runtime/lists/list-gen
 cp /etc/zapret2-manager/settings.json /tmp/before-settings.json
 "$current/install.sh" install
 cmp /tmp/before-settings.json /etc/zapret2-manager/settings.json
+if flock /var/lib/zapret2-manager/operation.lock "$current/install.sh" install; then
+    echo 'Installer incorrectly ignored the operation lock' >&2
+    exit 1
+fi
 zaper check > /tmp/check.log
 zaper profile-export > /tmp/profile.json
 zaper preset normal

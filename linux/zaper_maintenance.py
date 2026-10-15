@@ -28,7 +28,7 @@ HOSTS_SOURCE = 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtub
 MAX_DOWNLOAD = 4 * 1024 * 1024
 
 
-def download(url, timeout=18):
+def download(url, timeout=18, proxy=None):
     """Race direct and proxy routes; cancel and reap the losing curl process."""
     if not url.startswith('https://'):
         raise ValueError('Загрузка разрешена только по HTTPS')
@@ -36,12 +36,15 @@ def download(url, timeout=18):
     import threading
     import tempfile
     import time
+    from zaper_proxy import detected_proxy
+    proxy=proxy or detected_proxy()
     stop=threading.Event()
     def route(direct):
         command=['curl','--fail','--location','--proto','=https','--proto-redir','=https',
                  '--silent','--show-error','--connect-timeout','5','--max-time',str(timeout),
                  '--max-filesize',str(MAX_DOWNLOAD),'--user-agent','Zaper/'+VERSION]
         if direct:command+=['--noproxy','*']
+        elif proxy:command+=['--noproxy','','--proxy',proxy]
         with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
             process=subprocess.Popen(command+[url],stdout=output,stderr=errors)
             try:
@@ -92,12 +95,12 @@ def service_active():
     return subprocess.run(['systemctl', 'is-active', '--quiet', backend().SERVICE], timeout=5).returncode == 0
 
 
-def update_ips():
+def update_ips(proxy=None):
     from zaper_state import IP_OVERLAY
     text = None
     for url in IP_SOURCES:
         try:
-            value = download(url)
+            value = download(url,proxy=proxy)
             if 'api.github.com' in url:
                 value = base64.b64decode(json.loads(value)['content'], validate=False).decode('utf-8-sig')
             validate_ipset(value)

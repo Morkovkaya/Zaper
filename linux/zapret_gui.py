@@ -180,6 +180,10 @@ class App:
                 button.state(['disabled'])
         def worker():
             try:
+                worker_payload=payload
+                if args[0]=='update-ips':
+                    from zaper_proxy import detected_proxy
+                    worker_payload=json.dumps({'proxy':detected_proxy()})
                 if privileged:
                     if not INSTALLED.exists() or not shutil.which('pkexec'):
                         raise RuntimeError('Нужны установленный Zaper и polkit/pkexec; команды также доступны через sudo в терминале')
@@ -205,7 +209,7 @@ class App:
                         error.seek(0)
                         result=subprocess.CompletedProcess(command,process.returncode,''.join(output),error.read())
                 else:
-                    result = subprocess.run(command, input=payload, capture_output=True, text=True, timeout=300 if args[0]=='app-download' else 120)
+                    result = subprocess.run(command, input=worker_payload, capture_output=True, text=True, timeout=300 if args[0]=='app-download' else 120)
                 self.events.put(('result', result.returncode, result.stdout + result.stderr, after, quiet, background))
             except Exception as exc:
                 self.events.put(('result', 1, str(exc), None, False, background))

@@ -64,7 +64,7 @@ def run(argv):
                 elif command=='tune-recover': result=tune.recover(force=True)
                 elif command=='tune-results': result=json.loads(tune.results_path().read_text()) if tune.results_path().exists() else []
                 elif command=='measure': result=network.measure(2,event)
-                elif command=='faceit': result=network.faceit(args.server,event,os.environ.get('https_proxy') or os.environ.get('http_proxy'))
+                elif command=='faceit': result=network.faceit(args.server,event,__import__('zaper_proxy').detected_proxy())
                 else:
                     address,_=network.parse_server(args.server)
                     def changed(settings):
@@ -102,7 +102,11 @@ def run(argv):
         elif command == 'repair':
             result = maintenance.repair()
         elif command == 'update-ips':
-            result = maintenance.update_ips()
+            raw=sys.stdin.read(8193) if not sys.stdin.isatty() else ''
+            if len(raw)>8192:raise ValueError('Слишком длинный запрос proxy')
+            proxy=json.loads(raw).get('proxy') if raw.strip() else None
+            if proxy is not None and (not isinstance(proxy,str) or len(proxy)>4096 or '\n' in proxy):raise ValueError('Некорректный proxy')
+            result = maintenance.update_ips(proxy)
         elif command in ('hosts-read', 'hosts-preview'):
             raw = Path('/etc/hosts').read_bytes()
             text = raw.decode('utf-8-sig')

@@ -79,6 +79,12 @@ class ProxyStateTests(unittest.TestCase):
             proxy.write('pending.json',data);result=proxy.recover()
             self.assertEqual(desktop.values,['manual','new.proxy.example','8080']);self.assertTrue(result['external_changes_preserved'])
 
+    def test_detect_desktop_proxy_without_mutation(self):
+        with patch.dict(os.environ,{'XDG_CURRENT_DESKTOP':'GNOME'},clear=True),patch.object(proxy.Gnome,'read',return_value=["'manual'","'127.0.0.1'",'10809',"''",'0']),patch.object(proxy.Gnome,'put') as put:
+            self.assertEqual(proxy.detected_proxy(),'http://127.0.0.1:10809');put.assert_not_called()
+        with patch.dict(os.environ,{'https_proxy':'http://127.0.0.1:1234'},clear=True):
+            self.assertEqual(proxy.detected_proxy(),'http://127.0.0.1:1234')
+
     def test_duplicate_lock_and_validation(self):
         with proxy.lock():
             with self.assertRaisesRegex(RuntimeError,'уже'): proxy.recover()
