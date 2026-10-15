@@ -14,12 +14,19 @@ namespace ZapretManager {
 public class UiPreferences {public bool StartInTray,PanelAutoStart;public bool NotifyErrors=true;}
 public class SavedProfile {public string Name;public Settings Settings;public string[] Applications;public bool ExclusionsEnabled;}
 public static class Convenience {
+ public static string LaunchTaskName="Zapret2Manager-"+WindowsIdentity.GetCurrent().User.Value;
+ public static void SaveLaunchSettings(UiPreferences preferences,bool autoStart){
+  Core.Guard();var oldPreferences=Preferences();var settings=Core.Load();bool original=settings.AutoStart;uint? originalStart=null;
+  using(var key=Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+Core.Service)){if(key!=null)originalStart=Convert.ToUInt32(key.GetValue("Start",3));}
+  try{SavePreferences(preferences);if(originalStart.HasValue)Core.Startup(autoStart);if(original!=autoStart){settings.AutoStart=autoStart;Core.Write(Core.PathOf("manager-settings.json"),settings);}}
+  catch{try{SavePreferences(oldPreferences);}catch{}if(originalStart.HasValue)try{Core.ConfigureService(Core.Service,start:originalStart.Value);}catch{}throw;}
+ }
  public static UiPreferences Preferences(){try{return File.Exists(Core.PathOf("ui-preferences.json"))?Core.Read<UiPreferences>(Core.PathOf("ui-preferences.json")):new UiPreferences();}catch{return new UiPreferences();}}
  public static void SavePreferences(UiPreferences p){
-  string name="Zapret2Manager-"+WindowsIdentity.GetCurrent().User.Value;
+  string name=LaunchTaskName;
   Type type=Type.GetTypeFromProgID("Schedule.Service");dynamic scheduler=Activator.CreateInstance(type);scheduler.Connect();dynamic folder=scheduler.GetFolder("\\");
-  if(p.PanelAutoStart){dynamic task=scheduler.NewTask(0);task.RegistrationInfo.Description="Панель Zapret 2 Manager в системном трее";task.Principal.UserId=WindowsIdentity.GetCurrent().Name;task.Principal.LogonType=3;task.Principal.RunLevel=1;task.Settings.Enabled=true;task.Settings.DisallowStartIfOnBatteries=false;task.Settings.StopIfGoingOnBatteries=false;task.Settings.ExecutionTimeLimit="PT0S";dynamic trigger=task.Triggers.Create(9);trigger.UserId=WindowsIdentity.GetCurrent().Name;dynamic action=task.Actions.Create(0);action.Path=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Zapret2Manager.exe");action.Arguments="--tray";action.WorkingDirectory=AppDomain.CurrentDomain.BaseDirectory;folder.RegisterTaskDefinition(name,task,6,WindowsIdentity.GetCurrent().Name,null,3,null);}
-  else{try{folder.GetTask(name);folder.DeleteTask(name,0);}catch(System.Runtime.InteropServices.COMException e){if(e.ErrorCode!=unchecked((int)0x80070002))throw;}}
+  if(p.PanelAutoStart){dynamic task=scheduler.NewTask(0);task.RegistrationInfo.Description="Панель Zaper в системном трее";task.Principal.UserId=WindowsIdentity.GetCurrent().Name;task.Principal.LogonType=3;task.Principal.RunLevel=1;task.Settings.Enabled=true;task.Settings.DisallowStartIfOnBatteries=false;task.Settings.StopIfGoingOnBatteries=false;task.Settings.ExecutionTimeLimit="PT0S";dynamic trigger=task.Triggers.Create(9);trigger.UserId=WindowsIdentity.GetCurrent().Name;dynamic action=task.Actions.Create(0);action.Path=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Zapret2Manager.exe");action.Arguments="--tray";action.WorkingDirectory=AppDomain.CurrentDomain.BaseDirectory;folder.RegisterTaskDefinition(name,task,6,WindowsIdentity.GetCurrent().Name,null,3,null);}
+  else{try{folder.GetTask(name);folder.DeleteTask(name,0);}catch(FileNotFoundException){}catch(System.Runtime.InteropServices.COMException e){if(e.ErrorCode!=unchecked((int)0x80070002))throw;}}
   Core.Write(Core.PathOf("ui-preferences.json"),p);
  }
  public static async Task<string> Repair(CancellationToken token){
@@ -55,7 +62,7 @@ public static class Convenience {
  }
  public static void ExportDiagnostics(string file){
   using(var stream=new FileStream(file,FileMode.Create,FileAccess.ReadWrite,FileShare.None))using(var zip=new ZipArchive(stream,ZipArchiveMode.Create)){
-   Add(zip,"summary.txt","Zapret 2 Manager "+System.Reflection.Assembly.GetExecutingAssembly().GetName().Version+"\r\nUTC: "+DateTime.UtcNow.ToString("o")+"\r\nСлужба: "+Core.State()+"\r\nИсключения: "+Exclusions.State()+"\r\n"+Core.Context());
+   Add(zip,"summary.txt","Zaper "+System.Reflection.Assembly.GetExecutingAssembly().GetName().Version+"\r\nUTC: "+DateTime.UtcNow.ToString("o")+"\r\nСлужба: "+Core.State()+"\r\nИсключения: "+Exclusions.State()+"\r\n"+Core.Context());
    foreach(string name in new[]{"config.txt","manager-settings.json","zapret2-engine-status.json","app-exclusions-status.json"})if(File.Exists(Core.PathOf(name)))Add(zip,name,File.ReadAllText(Core.PathOf(name)));
    var c=Exclusions.Load();Add(zip,"excluded-applications.txt",string.Join("\r\n",(c.Applications??new string[0]).Select(Path.GetFileName)));
    foreach(string name in new[]{"native-manager.log","engine-service.log","exclusions-service.log"})if(File.Exists(Core.PathOf(name)))Add(zip,name,string.Join("\r\n",File.ReadLines(Core.PathOf(name)).Reverse().Take(300).Reverse()));

@@ -11,12 +11,12 @@ public sealed class TrayController:IDisposable {
  readonly Icon active,inactive;FormWindowState restored=FormWindowState.Normal;bool disposed,exitRequested;
  public TrayController(Form form,Action<string> service){
   owner=form;active=CreateIcon(Color.FromArgb(52,211,153));inactive=CreateIcon(Color.FromArgb(148,163,184));
-  menu=new ContextMenuStrip();status=new ToolStripMenuItem("zaper") {Enabled=false};menu.Items.Add(status);
+  menu=new ContextMenuStrip();status=new ToolStripMenuItem("Zaper") {Enabled=false};menu.Items.Add(status);
   menu.Items.Add("Открыть приложение",null,(s,e)=>Open());menu.Items.Add(new ToolStripSeparator());
   on=new ToolStripMenuItem("Включить",null,(s,e)=>service("On"));off=new ToolStripMenuItem("Выключить",null,(s,e)=>service("Off"));restart=new ToolStripMenuItem("Перезапустить",null,(s,e)=>service("Restart"));
   menu.Items.AddRange(new ToolStripItem[]{on,off,restart,new ToolStripSeparator()});
   menu.Items.Add("Выйти из приложения",null,(s,e)=>Exit());
-  tray=new NotifyIcon {Icon=inactive,Text="zaper",ContextMenuStrip=menu,Visible=true};
+  tray=new NotifyIcon {Icon=inactive,Text="Zaper",ContextMenuStrip=menu,Visible=true};
   tray.MouseClick+=(s,e)=>{if(e.Button==MouseButtons.Left)Open();};
   owner.Resize+=Resized;owner.FormClosed+=(s,e)=>Dispose();owner.Icon=inactive;
  }
@@ -25,9 +25,9 @@ public sealed class TrayController:IDisposable {
  public void Open(){if(disposed||owner.IsDisposed)return;owner.Show();owner.WindowState=restored;owner.BringToFront();owner.Activate();}
  public bool HideOnClose(FormClosingEventArgs e){if(!exitRequested&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;owner.Hide();return true;}return false;}
  public void Exit(){if(disposed)return;exitRequested=true;owner.Close();if(!owner.IsDisposed)exitRequested=false;}
- public void NotifyError(string text){if(disposed)return;string clean=Convenience.Redact(text);tray.ShowBalloonTip(6000,"zaper — ошибка",clean.Substring(0,Math.Min(200,clean.Length)),ToolTipIcon.Error);}
+ public void NotifyError(string text){if(disposed)return;string clean=Convenience.Redact(text);tray.ShowBalloonTip(6000,"Zaper — ошибка",clean.Substring(0,Math.Min(200,clean.Length)),ToolTipIcon.Error);}
  public bool Released {get{return disposed;}}
- public void Refresh(string state,bool busy){if(disposed)return;bool running=state=="Running";string text=running?"Zapret включён":state=="Stopped"?"Zapret выключен":state=="NotInstalled"?"Служба не установлена":"Состояние: "+state;status.Text=text;tray.Text="zaper — "+(busy?"выполняется операция":text);tray.Icon=running?active:inactive;owner.Icon=tray.Icon;on.Enabled=!busy&&state=="Stopped";off.Enabled=restart.Enabled=!busy&&running;}
+ public void Refresh(string state,bool busy){if(disposed)return;bool running=state=="Running";string text=running?"Zapret включён":state=="Stopped"?"Zapret выключен":state=="NotInstalled"?"Служба не установлена":"Состояние: "+state;status.Text=text;tray.Text="Zaper — "+(busy?"выполняется операция":text);tray.Icon=running?active:inactive;owner.Icon=tray.Icon;on.Enabled=!busy&&state=="Stopped";off.Enabled=restart.Enabled=!busy&&running;}
  public bool Test(){
   Refresh("Running",false);bool started=!on.Enabled&&off.Enabled&&restart.Enabled&&tray.Visible;
   Refresh("Stopped",false);bool stopped=on.Enabled&&!off.Enabled&&!restart.Enabled;

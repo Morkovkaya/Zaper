@@ -12,14 +12,18 @@ public static class UiRegression {
   string directory=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"tests");Directory.CreateDirectory(directory);var report=new List<string>();int failures=0;
   Action<bool,string> check=(ok,name)=>{report.Add((ok?"PASS: ":"FAIL: ")+name);if(!ok)failures++;};
   var form=new MainForm();form.Shown+=async(s,e)=>{try{
-   check(form.Text=="zaper 3.8.0","short zaper window title");
+   check(form.Text=="Zaper 3.8.1","short zaper window title");
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Настроить FACEIT")||b.Text=="График задержки"),"no duplicate FACEIT shortcut or separate graph launcher");
    check(All(form).OfType<LatencyPanel>().Count()==1,"graph embedded directly in diagnostics");
    check(await form.NetworkGraph.TestLocal(),"embedded diagnostics graph plots real loopback samples");
    check(await ParallelDownload(),"UI stays responsive while direct download cancels stalled proxy route");
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Обновить Hosts"))&&All(form).OfType<Button>().Any(b=>b.Text=="Hosts"),"Hosts editor entry replaces misleading update button");
    using(var servers=new FaceForm()){var buttons=All(servers).OfType<Button>().ToArray();check(buttons.Length==1&&buttons[0].Text=="Проверить","server window has only the requested check action");}
-   using(var preferences=new PreferencesForm(()=>{})){check(!All(preferences).OfType<Label>().Any(l=>l.Text.Contains("Крестик")),"tray settings omit redundant close hint");check(All(preferences).OfType<CheckBox>().Count()==3,"tray options retained with descriptions");}
+   using(var preferences=new PreferencesForm(()=>{})){check(preferences.Text=="Настройки запуска и трея","launch and tray window has requested title");check(!All(preferences).OfType<Label>().Any(l=>l.Text.Contains("Крестик")),"tray settings omit redundant close hint");check(All(preferences).OfType<CheckBox>().Count()==4,"panel, service, hidden startup and error options have descriptions");}
+   using(var excluded=new ExclusionForm()){check(excluded.Text=="Zaper — исключения приложений","exclusions title uses capital Zaper without 2");}
+   using(var about=new AboutForm()){check(about.Text=="О Zaper"&&All(about).OfType<Label>().Any(l=>l.Text=="Zaper"),"About window uses capital Zaper");}
+   using(var picker=new AppPicker(p=>{})){picker.Show(form);Application.DoEvents();check(picker.TestIconsAndSelection(),"EXE icons display and selection survives filtering");picker.Close();}
+   form.SelectPage(1);check(All(form).OfType<Button>().Any(b=>b.Text=="Настройки запуска и трея"&&b.Visible),"launch/tray entry is on Settings page");form.SelectPage(3);check(!All(form).OfType<Button>().Any(b=>b.Text=="Настройки запуска и трея"&&b.Visible),"launch/tray entry removed from Maintenance");form.SelectPage(0);
    check(typeof(MainForm).GetMethod("Confirm")==null,"manual Discord confirmation removed");
    using(var graph=new LatencyForm()){bool passed=await graph.TestLocal();File.WriteAllText(Path.Combine(directory,"graph-test.txt"),(passed?"PASS":"FAIL")+": loopback ping samples plotted, counter updates, graph disposal");check(passed,"live graph loopback samples");}
    string root=Core.Root;string fixture=Path.Combine(directory,"startup-fixture");Directory.CreateDirectory(fixture);

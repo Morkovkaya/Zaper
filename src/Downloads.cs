@@ -22,7 +22,7 @@ public static class Downloads {
   }
  }
  static async Task<string> FetchRoute(string url,string proxy,CancellationToken token){
-  var args=(proxy==null?"--noproxy \"*\"":"--noproxy \"\" --proxy "+Core.Quote(proxy.Contains("://")?proxy:"http://"+proxy))+" --fail --location --compressed --silent --show-error --connect-timeout 5 --max-time 18 --max-filesize 4194304 --user-agent zaper/3.8.0 "+Core.Quote(url);
+  var args=(proxy==null?"--noproxy \"*\"":"--noproxy \"\" --proxy "+Core.Quote(proxy.Contains("://")?proxy:"http://"+proxy))+" --fail --location --compressed --silent --show-error --connect-timeout 5 --max-time 18 --max-filesize 4194304 --user-agent zaper/3.8.1 "+Core.Quote(url);
   var result=await Core.Run(Path.Combine(Environment.SystemDirectory,"curl.exe"),args,token,21000);
   if(result.Exit!=0||string.IsNullOrWhiteSpace(result.Output))throw new IOException("Источник недоступен: "+new Uri(url).Host+" (curl "+result.Exit+")");return result.Output;
  }
