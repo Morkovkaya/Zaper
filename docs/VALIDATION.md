@@ -1,3 +1,13 @@
+# Release and install automation — 2026-10-16
+
+Linux 3.8.1-linux.4 adds distribution dependency installation and a privileged update action. CI publishes missing release versions only after both platform jobs succeed, from their exact uploaded artifacts; existing stable releases remain immutable and Linux uses latest=false.
+
+Initial implementation c74e24c passed [push CI](https://github.com/Morkovkaya/Zaper/actions/runs/38874020190) and [PR CI](https://github.com/Morkovkaya/Zaper/actions/runs/38874063189): Windows installer/self/integration checks, 62 packaged Linux tests, six publisher tests, 216 configurations on each architecture, native X11 and Wayland/HiDPI/tray, isolated real packet lifecycle and tuning rollback, legacy upgrades, staged install/uninstall, injected installation failure rollback and complete root updater fixture. The root updater fixture replaces GitHub network responses with the actual packaged bytes; real digest, safe extraction, dependency preflight and installation run in the disposable runner. Service state in the installer fault fixture uses a fake systemctl; packet lifecycle tests independently use the real engine.
+
+The follow-up adds an injected service-start failure and checks restoration of the old running service. Arch dependency package names were resolved read-only against the host package database. Dependency selection for Fedora/openSUSE is covered by command-plan tests; a real install on those distributions has not been exercised. First installation remains stopped; upgrades preserve service state, settings and user lists. Rollback covers reported install/verify/service-start failures, not power-loss recovery. No application installation, system packages, network/desktop proxy or boot changes were made on the portable Arch host.
+
+---
+
 # Нативные Wayland и X11 — Linux 3.8.1-linux.3 (16 октября 2026)
 
 GTK 3 заменяет Tk; приложение работает нативно в Wayland без XWayland и сохраняет X11. StatusNotifierItem/DBusMenu реализованы через Gio, без pystray/Pillow/AppIndicator; X11 также поддерживает встроенный Gtk.StatusIcon. В Wayland нет X11 API-пути. Окно скрывается после подтверждения хоста/регистрации, возвращается при потере хоста; поддерживается activation token от панели. Автозапуск панели учитывает отдельный start_in_tray.

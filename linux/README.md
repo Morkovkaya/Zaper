@@ -1,6 +1,6 @@
-# Zaper для Linux — 3.8.1-linux.3
+# Zaper для Linux — 3.8.1-linux.4
 
-Нативный Linux-порт обновлён вслед за Windows Zaper 3.8.1. Один архив **Zaper-3.8.1-linux.3-universal.tar.gz** для x86_64 и ARM64/aarch64. Python CLI/GTK, официальный статический nfqws2 1.0.5.2, nftables. Функции Windows 3.8.1 перенесены с Linux-эквивалентами системной интеграции.
+Нативный Linux-порт обновлён вслед за Windows Zaper 3.8.1. Один архив **Zaper-3.8.1-linux.4-universal.tar.gz** для x86_64 и ARM64/aarch64. Python CLI/GTK, официальный статический nfqws2 1.0.5.2, nftables. Функции Windows 3.8.1 перенесены с Linux-эквивалентами системной интеграции.
 
 ## Новое относительно Linux 3.6.3
 
@@ -49,7 +49,7 @@ GDK_BACKEND=x11 zaper-gui
 
 ```sh
 python3 zapret_manager.py check
-sudo ./install.sh install
+sudo ./install.sh install --with-deps
 zaper-gui
 # CLI с systemd:
 sudo zaper start
@@ -59,7 +59,11 @@ sudo zaper stop
 sudo zaper run                 # остановка Ctrl+C
 ```
 
-Для обновления предыдущей Linux-версии достаточно нового `install.sh install`. Каталог `/opt/zapret2-manager`, служба `zapret2-manager.service`, настройки `/etc/zapret2-manager` и старые команды `zapret2-manager` / `zapret2-manager-gui` сохранены. Добавлены короткие имена `zaper` / `zaper-gui`. Обновление останавливает существующую systemd-службу; после проверки включите её явно. Foreground-процесс нужно завершить перед обновлением.
+Установка с `--with-deps` сама добавляет недостающие зависимости для Arch/Manjaro, Debian/Ubuntu, Fedora и openSUSE через штатный менеджер пакетов. Она не обновляет всю ОС и не выбирает драйверы. Без этого флага установка пакетов не выполняется; `DESTDIR` всегда работает без изменений системы.
+
+Для следующих обновлений: **Обслуживание → Релизы / обновление приложения → Установить обновление**. Потребуется пароль администратора. Проверка GitHub, скачивание, SHA256, безопасная распаковка и установка выполняются автоматически; публичный репозиторий не требует токена. В терминале: `sudo zaper app-install`. После обновления закройте и откройте панель. Актуальная версия повторно не устанавливается, понижение версии и prerelease не выбираются.
+
+Для ручного обновления предыдущей Linux-версии достаточно нового `install.sh install`. Каталог `/opt/zapret2-manager`, служба `zapret2-manager.service`, настройки `/etc/zapret2-manager` и старые команды `zapret2-manager` / `zapret2-manager-gui` сохранены. Добавлены короткие имена `zaper` / `zaper-gui`. Обновление сохраняет состояние службы: работающая запускается снова, остановленная остаётся остановленной. При ошибке копирования, проверки или запуска службы установщик восстанавливает предыдущие файлы и службу. Настройки и пользовательские списки сохраняются. Первая установка не запускает службу автоматически. Foreground-процесс нужно завершить перед обновлением.
 
 Установка не запускает перехват и не включает автозапуск автоматически. Настройки панели находятся у текущего пользователя в `$XDG_CONFIG_HOME/zaper/preferences.json` (обычно `~/.config/zaper`). Автозапуск панели — отдельный XDG `.desktop` файл; автозапуск службы — отдельно через systemd. Изменение запуска службы не перезапускает её.
 
@@ -144,7 +148,7 @@ GNOME использует GSettings/dconf (`gsettings` из glib, schemas и dc
 
 Queue bypass сохраняет передачу при отсутствии движка. При штатной остановке/ошибке/сбое собственная таблица удаляется; после SIGKILL или отключения питания оставшаяся собственная таблица очищается при следующем старте.
 
-Автоподбор с rollback, proxy upload limiter и проверка/скачивание обновлений перенесены. Установка скачанного архива выполняется штатным `install.sh install`; токены GitHub не сохраняются. EXE-иконки и Windows Task Scheduler/SCM заменены Linux-подходами: IP/домены/UID, XDG и необязательная systemd-служба. Пробы не подтверждают голос/трансляцию Discord, реальный FACEIT-матч, Anti-Cheat или работу у конкретного провайдера.
+Автоподбор с rollback, proxy upload limiter и проверка/скачивание обновлений перенесены. Кнопка «Установить обновление» выполняет скачивание и установку автоматически через штатный установщик; токены GitHub не сохраняются. Старые панели до linux.4 требуют один раз установить новый архив вручную. EXE-иконки и Windows Task Scheduler/SCM заменены Linux-подходами: IP/домены/UID, XDG и необязательная systemd-служба. Пробы не подтверждают голос/трансляцию Discord, реальный FACEIT-матч, Anti-Cheat или работу у конкретного провайдера.
 
 ## Сборка и проверки
 
@@ -152,12 +156,12 @@ Queue bypass сохраняет передачу при отсутствии д�
 
 ```sh
 python3 scripts/package-linux.py
-python3 -m unittest discover -s dist/Zaper-3.8.1-linux.3/tests -p 'test_*.py' -v
-dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a /usr/bin/python3 dist/Zaper-3.8.1-linux.3/tests/gui_smoke.py
-dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray
-ZAPER_TEST_SCALE=2 dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray --watcher-loss
-python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.3
-sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zaper-3.8.1-linux.3/tests/integration.py'
+python3 -m unittest discover -s dist/Zaper-3.8.1-linux.4/tests -p 'test_*.py' -v
+dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a /usr/bin/python3 dist/Zaper-3.8.1-linux.4/tests/gui_smoke.py
+dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.4 --tray
+ZAPER_TEST_SCALE=2 dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.4 --tray --watcher-loss
+python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.4
+sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zaper-3.8.1-linux.4/tests/integration.py'
 ```
 
 Тест установки/обновления выполняйте только в одноразовом контейнере/VM. GitHub Actions проверяет предыдущий архив Linux, strict umask, реальные пакеты и трей. ARM64 проверяется под QEMU; отдельная ARM-машина и полноценная загрузка systemd не моделируются. Контейнеры используют ядро хоста. Архив содержит лицензии, исходники движка, контрольные суммы и копию восстановления.

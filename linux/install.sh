@@ -12,14 +12,19 @@ if [ -z "$stage" ] && [ "$(id -u)" -ne 0 ]; then
     echo 'Use sudo ./install.sh install (or uninstall)' >&2
     exit 1
 fi
-# Hold the same lock as configure/repair/autotune throughout a real installation.
-# DESTDIR is packaging only and must never touch the host's application state.
-if [ -z "$stage" ]; then
-    mkdir -p /var/lib/zapret2-manager
-    chmod 755 /var/lib/zapret2-manager
-    exec 9>/var/lib/zapret2-manager/operation.lock
-    flock -n 9 || { echo 'Another Zaper operation is active; wait before installing/removing' >&2; exit 1; }
-    test ! -f /var/lib/zapret2-manager/tune-pending.json || { echo 'Recover interrupted tuning first: sudo zaper tune-recover' >&2; exit 1; }
+# Internal file installation is invoked by the lock-holding transaction wrapper.
+case "$mode" in install|uninstall) ;; *) echo 'Usage: install.sh install [--with-deps] | uninstall' >&2; exit 2 ;; esac
+option=${2:-}
+case "$option" in ''|--with-deps|--files-only) ;; *) echo 'Unknown installer option' >&2; exit 2 ;; esac
+if [ -n "$stage" ] && [ "$option" = --with-deps ]; then
+    echo 'DESTDIR cannot install host dependencies' >&2; exit 2
+fi
+if [ "$option" = --with-deps ]; then
+    [ "$mode" = install ] || exit 2
+    /bin/sh "$source_dir/dependencies.sh"
+fi
+if [ -z "$stage" ] && [ "$option" != --files-only ]; then
+    exec /usr/bin/python3 -I "$source_dir/zaper_install.py" "$source_dir" "$mode"
 fi
 case "$mode" in
  install)
@@ -38,6 +43,7 @@ case "$mode" in
     mkdir -p "$app" "$(dirname "$cli")" "$(dirname "$unit")" "$stage/usr/share/applications"
     mkdir -p "$stage/etc/zapret2-manager" "$stage/var/lib/zapret2-manager"
     chmod 755 "$stage/etc/zapret2-manager" "$stage/var/lib/zapret2-manager"
+    cp "$source_dir"/install.sh "$source_dir"/dependencies.sh "$app/"
     cp "$source_dir"/*.py "$source_dir"/runtime-repair.* "$source_dir"/zaper.png "$source_dir/LICENSE" "$source_dir/THIRD_PARTY_NOTICES.md" "$app/"
     cp "$source_dir"/zapret2-*-source.tar.gz "$app/"
     task_user_lists=$(mktemp -d)
@@ -84,7 +90,7 @@ Categories=Network;
 EOF
     chmod 644 "$unit" "$stage/usr/share/applications/zapret2-manager.desktop"
     if [ -z "$stage" ] && [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
-    echo 'Installed. GUI: zapret2-manager-gui; CLI: zapret2-manager. Start explicitly with sudo zapret2-manager start.'
+    echo 'Installed. GUI: zapret2-manager-gui; CLI: zapret2-manager. A running service is restored after upgrade; initial start: sudo zaper start.'
     ;;
  uninstall)
     test -f "$app/.zapret2-manager-install" || { echo 'No owned installation found' >&2; exit 1; }
