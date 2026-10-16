@@ -51,8 +51,8 @@ def publish(directory, repo, commit, run=gh):
         checksum = artifact.parent/f'SHA256-{version}.txt'
         checksum.write_text(hashlib.sha256(artifact.read_bytes()).hexdigest()+'  '+name+'\n')
         if not existing:
-            run('release', 'create', tag, '--repo', repo, '--target', commit, '--draft', '--title', 'Zaper '+version,
-                '--notes', f'Автоматический выпуск из проверенной сборки {commit}.\nWindows и Linux: все обязательные проверки CI пройдены.\nПроверяйте SHA256 перед ручной установкой.')
+            run('release', 'create', tag, '--repo', repo, '--target', commit, '--draft', '--generate-notes', '--title', 'Zaper '+version,
+                '--notes', f'Автоматический выпуск из проверенной сборки {commit}.\nWindows и Linux: все обязательные проверки CI пройдены.\nПроверяйте SHA256 перед ручной установкой.\n\nLinux: распакуйте архив и выполните `sudo ./install.sh install --with-deps`. Дальнейшие обновления: Обслуживание → Релизы / обновление приложения → Установить обновление. Настройки и состояние службы сохраняются.')
         run('release', 'upload', tag, str(artifact), str(checksum), '--repo', repo, '--clobber')
         # Assert the server received precisely the tested artifact before making it visible.
         assets = json.loads(run('release', 'view', tag, '--repo', repo, '--json', 'assets'))['assets']

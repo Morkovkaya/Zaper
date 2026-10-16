@@ -32,7 +32,10 @@ from pathlib import Path
 state=Path(os.environ['ZAPER_FIXTURE_SERVICE'])
 args=sys.argv[1:]
 if args[0]=='is-active':sys.exit(0 if state.read_text()=='active' else 3)
-if args[0]=='start':state.write_text('active')
+if args[0]=='start':
+    failure=Path(os.environ['ZAPER_FIXTURE_SERVICE']+'-fail')
+    if failure.exists():failure.unlink();sys.exit(17)
+    state.write_text('active')
 if args[0]=='stop':state.write_text('inactive')
 ''');fake.chmod(0o755)
     os.environ['PATH']=str(fakebin)+':'+os.environ['PATH'];os.environ['ZAPER_FIXTURE_SERVICE']=str(state)
@@ -53,6 +56,12 @@ if args[0]=='stop':state.write_text('inactive')
         assert state.read_text()=='active','Previous running service was not restored'
         assert digest_tree(Path('/opt/zapret2-manager'))==before,'Previous installed bytes changed'
         assert config.read_bytes()==before_config and user.read_text()=='keep.example.org\n'
+        Path(str(state)+'-fail').touch()
+        try:installer.install(source,'install')
+        except subprocess.CalledProcessError:pass
+        else:raise AssertionError('Service start failure was ignored')
+        assert state.read_text()=='active','Previous service did not recover after new service start failed'
+        assert digest_tree(Path('/opt/zapret2-manager'))==before
         installer.install(source,'install')
         assert state.read_text()=='active','Running service was not restarted after upgrade'
         state.write_text('inactive');installer.install(source,'install')

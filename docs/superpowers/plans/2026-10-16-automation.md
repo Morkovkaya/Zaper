@@ -20,29 +20,29 @@
 ### Task 1: Trusted automatic release gate
 **Files:** scripts/release.py, scripts/tests/test_release.py, .github/workflows/build.yml, linux/zaper_version.py.
 **Interfaces:** metadata() returns windows/linux versions and bundle; publish(directory) consumes downloaded CI artifacts.
-- [ ] Test version consistency, artifacts, immutable published versions, draft retry and failure paths with a mocked gh runner.
-- [ ] Generate dynamic Linux bundle paths in CI; bump Linux to 3.8.1-linux.4.
-- [ ] Publish missing versions on trusted main only after both test jobs. Draft first; upload checksums and assets; mark Windows latest and Linux latest=false. Keep workflow contents read except publisher.
-- [ ] Run tests, package locally, inspect diff; commit.
+- [x] Test version consistency, artifacts, immutable published versions, draft retry and failure paths with a mocked gh runner.
+- [x] Generate dynamic Linux bundle paths in CI; bump Linux to 3.8.1-linux.4.
+- [x] Publish missing versions on trusted main only after both test jobs. Draft first; upload checksums and assets; mark Windows latest and Linux latest=false. Keep workflow contents read except publisher.
+- [x] Run tests, package locally, inspect diff; commit.
 
 ### Task 2: Dependency and transactional install
 **Files:** linux/install.sh, linux/zaper_install.py, linux/tests/test_install.py, linux/tests/upgrade.sh.
 **Interfaces:** install.sh install --with-deps installs distro packages then delegates existing install; transaction wrapper snapshots owned files and service state, invokes install.sh --files-only, restores on failure.
-- [ ] Test distro selection and package command arguments; refuse unsupported distributions without touching files; DESTDIR never installs dependencies.
-- [ ] Add Arch/Debian/Ubuntu/Fedora/openSUSE dependency selection; no full system upgrade.
-- [ ] Add private backup and rollback of owned installation files; preserve running state after successful upgrade and restart old service on failure.
-- [ ] Verify staged install and real disposable upgrade/rollback, including operation lock.
+- [x] Test distro selection and package command arguments; refuse unsupported distributions without touching files; DESTDIR never installs dependencies.
+- [x] Add Arch/Debian/Ubuntu/Fedora/openSUSE dependency selection; no full system upgrade.
+- [x] Add private backup and rollback of owned installation files; preserve running state after successful upgrade and restart old service on failure.
+- [x] Verify staged install and real disposable upgrade/rollback, including operation lock.
 
 ### Task 3: One-click Linux update
 **Files:** linux/zaper_updates.py, linux/zaper_commands.py, linux/zapret_gui.py, linux/tests/test_updates.py.
 **Interfaces:** install(token='') returns updated/version/restart_panel. CLI app-install is root only; GUI invokes installed privileged command and displays result.
-- [ ] Reject draft/prerelease and mismatched tag/asset versions; report current version without reinstall/downgrade.
-- [ ] Safely extract verified archive, require complete installer/runtime, invoke installer in private root directory; preserve token only in memory.
-- [ ] Add GUI install button and appropriate download/install timeout; tell user to reopen panel after update.
-- [ ] Test hostile archive entries, digest failure, no-op current version, root requirement, installer failure.
+- [x] Reject draft/prerelease and mismatched tag/asset versions; report current version without reinstall/downgrade.
+- [x] Safely extract verified archive, require complete installer/runtime, invoke installer in private root directory; preserve token only in memory.
+- [x] Add GUI install button and appropriate download/install timeout; tell user to reopen panel after update.
+- [x] Test hostile archive entries, digest failure, no-op current version, root requirement, installer failure.
 
 ### Task 4: End-to-end delivery
 **Files:** README.md, linux/README.md, docs/VALIDATION.md, workflow.
-- [ ] Document the dependency installer, one-click update and version-triggered automatic releases.
+- [x] Document the dependency installer, one-click update and version-triggered automatic releases.
 - [ ] Run all packaged tests and full CI (Windows, X11, Wayland, ARM64, real engine, old upgrades); fix any failures.
 - [ ] Open and attach PR, merge after checks, observe main publishing Linux.4 automatically and verify public download SHA256.
