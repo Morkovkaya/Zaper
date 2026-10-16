@@ -1,6 +1,6 @@
-# Zaper для Linux — 3.8.1-linux.2
+# Zaper для Linux — 3.8.1-linux.3
 
-Нативный Linux-порт обновлён вслед за Windows Zaper 3.8.1. Один архив **Zaper-3.8.1-linux.2-universal.tar.gz** для x86_64 и ARM64/aarch64. Python CLI/Tk, официальный статический nfqws2 1.0.5.2, nftables. Функции Windows 3.8.1 перенесены с Linux-эквивалентами системной интеграции.
+Нативный Linux-порт обновлён вслед за Windows Zaper 3.8.1. Один архив **Zaper-3.8.1-linux.3-universal.tar.gz** для x86_64 и ARM64/aarch64. Python CLI/GTK, официальный статический nfqws2 1.0.5.2, nftables. Функции Windows 3.8.1 перенесены с Linux-эквивалентами системной интеграции.
 
 ## Новое относительно Linux 3.6.3
 
@@ -11,24 +11,37 @@
 - IP-обновление: параллельные HTTPS-маршруты напрямую и через proxy из окружения с отменой проигравшего, резервный GitHub API, проверка содержимого и откат файла/службы при ошибке применения. Runtime-манифест не изменяется: обновлённый список находится отдельно в `/etc/zapret2-manager/ipset-all.txt`.
 - Редактор Hosts: предпросмотр предложенных записей, сохранение только по кнопке, копия исходника и проверка сторонних изменений. Повторное сохранение и несохранённые правки поддерживаются.
 - ZIP диагностики с маскированием секретов и домашних путей; журнал доступен в пределах прав пользователя. График ICMP-задержки и трафика выбирает сетевой интерфейс по текущему маршруту.
-- Необязательный трей: запуск скрытым, восстановление окна, включение/выключение и выход. При отсутствии поддерживаемого трея окно остаётся видимым. Все операции выполняются вне Tk-потока.
+- Необязательный трей: запуск скрытым, восстановление окна, включение/выключение и выход. При отсутствии поддерживаемого трея окно остаётся видимым. Все операции выполняются вне GTK-потока.
 
 ## Требования
 
-Linux с NFQUEUE/nftables, util-linux (flock), Python **3.10+**. Tk — для GUI; curl — для HTTPS-проверок и загрузок IP/Hosts/обновлений; getent и ping — для DNS/ICMP. Для QUIC-проверки нужна сборка curl с HTTP3 (проверка отсутствующей возможности явно отмечается как непроверенная). Для административных кнопок нужны polkit/pkexec и агент авторизации рабочего окружения. systemd необязателен: без него доступен foreground-запуск. CLI использует только стандартную библиотеку Python.
+Linux с NFQUEUE/nftables, util-linux (flock), Python **3.10+**. GTK 3, PyGObject и Cairo — для GUI; curl — для HTTPS-проверок и загрузок IP/Hosts/обновлений; getent и ping — для DNS/ICMP. Для QUIC-проверки нужна сборка curl с HTTP3 (проверка отсутствующей возможности явно отмечается как непроверенная). Для административных кнопок нужны polkit/pkexec и агент авторизации рабочего окружения. systemd необязателен: без него доступен foreground-запуск. CLI использует только стандартную библиотеку Python.
 
 Примеры зависимостей:
 
 ```sh
 # Arch
-sudo pacman -S python tk nftables curl polkit iproute2 iputils
+sudo pacman -S python python-gobject python-cairo gtk3 nftables curl polkit iproute2 iputils
 # Debian / Ubuntu
-sudo apt install python3 python3-tk nftables curl policykit-1 iproute2 iputils-ping
+sudo apt install python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 nftables curl policykit-1 iproute2 iputils-ping
 # Fedora
-sudo dnf install python3 python3-tkinter nftables curl polkit iproute iputils
+sudo dnf install python3 python3-gobject python3-cairo gtk3 nftables curl polkit iproute iputils
 ```
 
-Трей требует **pystray**, Pillow и поддерживаемую панель X11 либо AppIndicator/StatusNotifierWatcher. Пример для Debian/Ubuntu: `sudo apt install python3-pystray`. Для GNOME может потребоваться расширение рабочего окружения. Наличие pystray само по себе не гарантирует поддержку трея; при невозможности проверить доступность приложение оставляет окно открытым. [Документация pystray о Linux backends](https://pystray.readthedocs.io/en/latest/usage.html#supported-backends).
+## Wayland и X11
+
+Панель использует **GTK 3** и работает нативно в Wayland, без XWayland. В X11 используется тот же интерфейс. Сохраняются все пять вкладок, диалоги выбора файлов, фоновые операции и настройки. Для явного выбора backend:
+
+```sh
+GDK_BACKEND=wayland zaper-gui
+GDK_BACKEND=x11 zaper-gui
+```
+
+В обычном запуске GTK выбирает доступный backend окружения. CLI/служба не зависят от GTK или графического сеанса. [GTK о Wayland](https://docs.gtk.org/gtk3/wayland.html).
+
+Трей использует собственный **StatusNotifierItem/DBusMenu через Gio D-Bus**. Pystray, Pillow и библиотека AppIndicator не нужны. Подходит панель с StatusNotifierHost (например, KDE Plasma или соответствующий модуль Waybar); GNOME требует расширение AppIndicator/StatusNotifier. В X11 также поддерживается классический встроенный трей. Нет хоста/готовности трея — окно остаётся видимым; при исчезновении хоста скрытое окно возвращается. Готовность проверяет зарегистрированный хост и подтверждение регистрации, а не только имя D-Bus-службы. Поддерживается передача Wayland activation token от панели. [Протокол StatusNotifier](https://specifications.freedesktop.org/status-notifier-item/latest-single/).
+
+Автозапуск панели сохраняет `start_in_tray` как отдельное предпочтение: вновь сохранённый XDG launcher не навязывает `--tray`. При обновлении старый пользовательский launcher можно пересохранить через настройки запуска. GTK автоматически учитывает масштаб дисплея; страницы прокручиваются.
 
 ## Установка и обновление
 
@@ -139,10 +152,12 @@ Queue bypass сохраняет передачу при отсутствии д�
 
 ```sh
 python3 scripts/package-linux.py
-python3 -m unittest discover -s dist/Zaper-3.8.1-linux.2/tests -p 'test_*.py' -v
-xvfb-run -a python3 dist/Zaper-3.8.1-linux.2/tests/gui_smoke.py
-python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.2
-sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zaper-3.8.1-linux.2/tests/integration.py'
+python3 -m unittest discover -s dist/Zaper-3.8.1-linux.3/tests -p 'test_*.py' -v
+dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a /usr/bin/python3 dist/Zaper-3.8.1-linux.3/tests/gui_smoke.py
+dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray
+ZAPER_TEST_SCALE=2 dbus-run-session -- scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray --watcher-loss
+python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.3
+sudo unshare --net sh -c 'ip link set lo up; ZAPRET_ISOLATED_TEST=1 python3 dist/Zaper-3.8.1-linux.3/tests/integration.py'
 ```
 
 Тест установки/обновления выполняйте только в одноразовом контейнере/VM. GitHub Actions проверяет предыдущий архив Linux, strict umask, реальные пакеты и трей. ARM64 проверяется под QEMU; отдельная ARM-машина и полноценная загрузка systemd не моделируются. Контейнеры используют ядро хоста. Архив содержит лицензии, исходники движка, контрольные суммы и копию восстановления.

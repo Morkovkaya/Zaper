@@ -36,7 +36,7 @@ def save(preferences, root=None):
     old_autostart = autostart.read_bytes() if autostart.exists() else None
     try:
         if preferences.panel_autostart:
-            atomic_bytes(autostart, b'[Desktop Entry]\nType=Application\nName=Zaper\nExec=/usr/local/bin/zapret2-manager-gui --tray\nIcon=zaper\nTerminal=false\nX-GNOME-Autostart-enabled=true\n')
+            atomic_bytes(autostart, b'[Desktop Entry]\nType=Application\nName=Zaper\nExec=/usr/local/bin/zapret2-manager-gui\nIcon=zaper\nTerminal=false\nX-GNOME-Autostart-enabled=true\n')
         else:
             autostart.unlink(missing_ok=True)
         atomic_bytes(path, (json.dumps(dataclasses.asdict(preferences), indent=2) + '\n').encode())
