@@ -276,7 +276,7 @@ class App:
                         error.seek(0)
                         result = subprocess.CompletedProcess(command, process.returncode, ''.join(output), error.read())
                 else:
-                    result = subprocess.run(command, input=worker_payload, capture_output=True, text=True, timeout=300 if args[0] == 'app-download' else 120)
+                    result = subprocess.run(command, input=worker_payload, capture_output=True, text=True, timeout=1800 if args[0] == 'app-install' else 300 if args[0] == 'app-download' else 120)
                 self.events.put(('result', result.returncode, result.stdout + result.stderr, after, quiet, background))
             except Exception as exc: self.events.put(('result', 1, str(exc), None, False, background))
         threading.Thread(target=worker, daemon=True).start()
@@ -436,6 +436,11 @@ class App:
         def download():
             directory = self.picker('Каталог для обновления', directory=True)
             if directory: self.run(['app-download', '--directory', directory], payload=json.dumps({'token': token.get()}), after=lambda output: self.result_dialog('Проверенный архив', output), quiet=True)
+        def installed(output):
+            data = json.loads(output)
+            if window in self.dialogs: details.set_text(data['message'])
+            self.result_dialog('Обновление Zaper', data['message'])
+        self.row(content, self.button('Установить обновление', lambda: self.run(['app-install'], True, payload=json.dumps({'token': token.get()}), after=installed, quiet=True)))
         self.row(content, self.button('Проверить релиз', lambda: self.run(['app-updates'], payload=json.dumps({'token': token.get()}), after=checked, quiet=True)), self.button('Скачать с SHA256', download), self.button('Открыть Releases', lambda: webbrowser.open('https://github.com/Morkovkaya/Zaper/releases'), managed=False))
         window.show_all(); return window
 

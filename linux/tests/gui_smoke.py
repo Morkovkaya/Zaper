@@ -53,6 +53,11 @@ try:
     app.dialogs[0].destroy(); drain()
     window = app.launch_dialog(); drain(); window.destroy(); drain()
     token_window = app.update_dialog(); token_window.token.set('fixture-secret'); drain()
+    install_button = next(widget for widget in descendants(token_window) if isinstance(widget, Gtk.Button) and widget.get_label() == 'Установить обновление')
+    with patch.object(app, 'run') as command:
+        install_button.emit('clicked')
+        assert command.call_args.args == (['app-install'], True)
+        assert json.loads(command.call_args.kwargs['payload']) == {'token':'fixture-secret'}
     token_window.destroy(); drain()
     assert token_window.token.get() == ''
     faceit_window = app.faceit_dialog(); drain(); faceit_window.destroy(); drain()

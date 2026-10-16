@@ -46,31 +46,36 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve release versions
+        id: versions
+        run: python3 scripts/release.py metadata >> "$GITHUB_OUTPUT"
+      - name: Release automation tests
+        run: python3 -m unittest discover -s scripts/tests -v
       - name: Package pinned universal runtime
         run: python3 scripts/package-linux.py
       - name: Install test tools
         run: sudo apt-get update -qq && sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 weston xvfb nftables qemu-user curl openssl trayer gsettings-desktop-schemas libglib2.0-bin dconf-cli dbus-x11 libkf5config-bin
       - name: Unit tests and all engine configurations
-        run: python3 -m unittest discover -s dist/Zaper-3.8.1-linux.3/tests -p 'test_*.py' -v
+        run: python3 -m unittest discover -s dist/${{ steps.versions.outputs.bundle }}/tests -p 'test_*.py' -v
       - name: GUI smoke test
-        run: dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a /usr/bin/python3 dist/Zaper-3.8.1-linux.3/tests/gui_smoke.py
+        run: dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a /usr/bin/python3 dist/${{ steps.versions.outputs.bundle }}/tests/gui_smoke.py
       - name: Real X11 tray lifecycle
         run: |
-          cd dist/Zaper-3.8.1-linux.3
+          cd dist/${{ steps.versions.outputs.bundle }}
           dbus-run-session -- env GDK_BACKEND=x11 xvfb-run -a sh -c 'trayer --edge top --align right --widthtype request --height 28 & task_tray_pid=$!; sleep 1; timeout 45 /usr/bin/python3 tests/gui_smoke.py --tray; task_status=$?; kill "$task_tray_pid"; exit "$task_status"'
       - name: Native Wayland without XWayland
-        run: dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3
+        run: dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/${{ steps.versions.outputs.bundle }}
       - name: Native Wayland tray and host loss
-        run: dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray
+        run: dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/${{ steps.versions.outputs.bundle }} --tray
       - name: Native Wayland HiDPI and watcher loss
-        run: ZAPER_TEST_SCALE=2 dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray --watcher-loss
+        run: ZAPER_TEST_SCALE=2 dbus-run-session -- timeout 60 scripts/test-wayland.sh dist/${{ steps.versions.outputs.bundle }} --tray --watcher-loss
       - name: Native Wayland with virtual input seat
-        run: ZAPER_WESTON_BACKEND=x11 ZAPER_TEST_SCALE=2 dbus-run-session -- xvfb-run -a -s '-screen 0 2800x2200x24' timeout 60 scripts/test-wayland.sh dist/Zaper-3.8.1-linux.3 --tray
+        run: ZAPER_WESTON_BACKEND=x11 ZAPER_TEST_SCALE=2 dbus-run-session -- xvfb-run -a -s '-screen 0 2800x2200x24' timeout 60 scripts/test-wayland.sh dist/${{ steps.versions.outputs.bundle }} --tray
       - name: ARM64 real engine profile checks
-        run: python3 scripts/test-arm64.py dist/Zaper-3.8.1-linux.3
+        run: python3 scripts/test-arm64.py dist/${{ steps.versions.outputs.bundle }}
       - name: Isolated real packet lifecycle
         run: |
-          cp -R dist/Zaper-3.8.1-linux.3 /tmp/zapret2-ci
+          cp -R dist/${{ steps.versions.outputs.bundle }} /tmp/zapret2-ci
           sudo unshare --net sh -c 'ip link set lo up; setpriv --bounding-set=-all,+net_admin,+net_raw,+setuid,+setgid,+setpcap,+kill --no-new-privs env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/integration.py'
       - name: Real engine auto-tune and rollback (isolated network)
         run: sudo unshare --net sh -c 'ip link set lo up; env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/tune_integration.py'
@@ -79,14 +84,16 @@ jobs:
       - name: GNOME and KDE proxy recovery (isolated desktop session)
         run: |
           task_desktop_root=$(mktemp -d /tmp/zaper-desktop.XXXXXX)
-          env ZAPER_ISOLATED_DESKTOP=1 XDG_CONFIG_HOME="$task_desktop_root/config" XDG_STATE_HOME="$task_desktop_root/state" dbus-run-session -- python3 dist/Zaper-3.8.1-linux.3/tests/proxy_desktop.py
+          env ZAPER_ISOLATED_DESKTOP=1 XDG_CONFIG_HOME="$task_desktop_root/config" XDG_STATE_HOME="$task_desktop_root/state" dbus-run-session -- python3 dist/${{ steps.versions.outputs.bundle }}/tests/proxy_desktop.py
       - name: Staged install and uninstall
         run: |
-          cd dist/Zaper-3.8.1-linux.3
+          cd dist/${{ steps.versions.outputs.bundle }}
           DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh install
           test -x "$RUNNER_TEMP/zapret-stage/usr/local/bin/zapret2-manager"
           DESTDIR="$RUNNER_TEMP/zapret-stage" ./install.sh uninstall
           test ! -e "$RUNNER_TEMP/zapret-stage/opt/zapret2-manager"
+      - name: Transactional install and failure rollback (disposable runner)
+        run: sudo env ZAPRET_ISOLATED_TEST=1 python3 /tmp/zapret2-ci/tests/install_transaction.py "$GITHUB_WORKSPACE/dist/${{ steps.versions.outputs.bundle }}-universal.tar.gz"
       - name: Download legacy Linux release for upgrade test
         env:
           GH_TOKEN: ${{ github.token }}
@@ -111,3 +118,27 @@ jobs:
           name: linux-universal
           path: dist/*-universal.tar.gz
           if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-releases
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-universal
+          path: artifacts/linux
+      - name: Publish missing versions from tested artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release.py publish artifacts "$GITHUB_REPOSITORY" "$GITHUB_SHA"

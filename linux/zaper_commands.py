@@ -9,7 +9,7 @@ import sys
 
 COMMANDS = {'history', 'restore', 'profile-export', 'profile-import', 'preset', 'repair', 'update-ips',
             'hosts-read', 'hosts-preview', 'hosts-save', 'diagnostics-export', 'monitor', 'app-updates', 'measure', 'faceit', 'faceit-exclude', 'autotune', 'tune-cancel', 'tune-recover', 'tune-results',
-            'proxy-start', 'proxy-stop', 'proxy-status', 'proxy-recover', 'fake-list', 'app-download'}
+            'proxy-start', 'proxy-stop', 'proxy-status', 'proxy-recover', 'fake-list', 'app-download', 'app-install'}
 
 
 def run(argv):
@@ -41,7 +41,7 @@ def run(argv):
     if command in ('restore','preset','profile-import','faceit-exclude'):parser.add_argument('--apply',action='store_true')
     args = parser.parse_args(argv[1:])
     try:
-        if command in ('restore', 'profile-import', 'preset', 'repair', 'update-ips', 'hosts-save', 'autotune', 'tune-cancel', 'tune-recover', 'faceit-exclude'):
+        if command in ('restore', 'profile-import', 'preset', 'repair', 'update-ips', 'hosts-save', 'autotune', 'tune-cancel', 'tune-recover', 'faceit-exclude', 'app-install'):
             zm.require_root()
         if command.startswith('proxy-'):
             import zaper_proxy as proxy
@@ -123,14 +123,14 @@ def run(argv):
             result = {'zip_base64': base64.b64encode(maintenance.diagnostics_zip()).decode()}
         elif command == 'monitor':
             result = maintenance.monitor_sample(args.target)
-        elif command in ('app-updates','app-download'):
+        elif command in ('app-updates','app-download','app-install'):
             import zaper_updates as updates
             raw=sys.stdin.read(8193) if not sys.stdin.isatty() else ''
             if len(raw)>8192: raise ValueError('Слишком длинный запрос обновления')
             token=json.loads(raw).get('token','') if raw.strip() else ''
             if not isinstance(token,str): raise ValueError('Некорректный токен')
-            result=updates.check(token) if command=='app-updates' else updates.download(args.directory,token)
-            result['installed']=zm.VERSION
+            result=updates.check(token) if command=='app-updates' else updates.install(token) if command=='app-install' else updates.download(args.directory,token)
+            result.setdefault('installed',zm.VERSION)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, TypeError, KeyError, RuntimeError, __import__('subprocess').SubprocessError) as exc:

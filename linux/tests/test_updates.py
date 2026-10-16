@@ -37,3 +37,41 @@ class UpdatesTests(unittest.TestCase):
         self.assertFalse(target.has_header('Authorization'))
         with self.assertRaises(ValueError):updates.Redirect().redirect_request(request,None,302,'',{},'http://example.org/file')
         with self.assertRaises(ValueError):updates.request(updates.API+'/releases',token='bad\nsecret')
+
+    def test_mismatched_asset_and_prerelease_are_not_selected(self):
+        item=dict(tag_name='v3.8.1-linux.4',draft=False,prerelease=False,html_url='https://github.com/test',assets=[dict(name='Zaper-3.8.1-linux.3-universal.tar.gz',digest='sha256:'+'1'*64,id=1,size=1)])
+        with self.assertRaises(RuntimeError):updates.select([item])
+        item['assets'][0]['name']='Zaper-3.8.1-linux.4-universal.tar.gz';item['prerelease']=True
+        with self.assertRaises(RuntimeError):updates.select([item])
+
+    def test_current_or_older_version_does_not_download_or_install(self):
+        from zaper_version import VERSION
+        for version in ('v'+VERSION,'v1.0.0-linux.1'):
+            with patch.object(updates.os,'geteuid',return_value=0),patch.object(updates,'check',return_value=dict(tag=version)),patch.object(updates,'download') as download:
+                self.assertFalse(updates.install()['updated']);download.assert_not_called()
+        with patch.object(updates.os,'geteuid',return_value=1000),self.assertRaises(PermissionError):updates.install()
+
+    def test_archive_rejects_traversal_links_and_oversize(self):
+        import tarfile
+        for name,kind,size in [('../escape',tarfile.REGTYPE,1),('Zaper-test/link',tarfile.SYMTYPE,0),('/absolute',tarfile.REGTYPE,1),('Other/file',tarfile.REGTYPE,1),('Zaper-test/huge',tarfile.REGTYPE,513*1024*1024)]:
+            with tempfile.TemporaryDirectory() as temp:
+                archive=Path(temp)/'test.tar.gz'
+                with tarfile.open(archive,'w:gz') as output:
+                    member=tarfile.TarInfo(name);member.type=kind;member.size=size
+                    # A header alone is enough: reject dangerous metadata before reading data.
+                    output.fileobj.write(member.tobuf())
+                with self.assertRaises(ValueError):updates.extract(archive,Path(temp)/'out','Zaper-test')
+
+    def test_safe_extract_and_failed_installer(self):
+        import tarfile
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);archive=root/'test.tar.gz'
+            with tarfile.open(archive,'w:gz') as output:
+                for name in ('install.sh','zaper_install.py','dependencies.sh','zapret_manager.py','runtime/sha256.json'):
+                    member=tarfile.TarInfo('Zaper-99.0.0-linux.1/'+name);member.size=4
+                    output.addfile(member,io.BytesIO(b'test'))
+            bundle=updates.extract(archive,root/'out','Zaper-99.0.0-linux.1')
+            self.assertTrue((bundle/'install.sh').is_file())
+            with patch.object(updates.os,'geteuid',return_value=0),patch.object(updates,'check',return_value=dict(tag='v99.0.0-linux.1')),patch.object(updates,'download',return_value=dict(path=str(archive))),patch('subprocess.run',return_value=subprocess.CompletedProcess([],1,stdout='',stderr='fixture installation failed')):
+                with self.assertRaisesRegex(RuntimeError,'fixture installation failed'):updates.install()
