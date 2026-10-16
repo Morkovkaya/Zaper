@@ -128,7 +128,7 @@ class App:
         main.pack_start(label('Журнал операций'), False, False, 0)
         self.log = text_view(); main.pack_start(scroll(self.log, 88), False, False, 0)
         root.show_all()
-        self.refresh(); self.later(60, self.poll, repeat=True)
+        self.refresh(); self.refresh_status(); self.later(60, self.poll, repeat=True)
         self.later(3000, self.refresh_status, repeat=True)
         if not smoke:
             self.later(200, lambda: self.setup_tray(start_in_tray or self.preferences.start_in_tray))
@@ -139,7 +139,7 @@ class App:
         Gtk.Settings.get_default().set_property('gtk-application-prefer-dark-theme', True)
         if hasattr(self, 'css'): return
         self.css = Gtk.CssProvider()
-        self.css.load_from_data(b'.zaper {background: #141b2b; color: #edf2ff;} .zaper .title {font-size: 24px; font-weight: bold;} .zaper button {padding: 7px 10px;} .zaper textview text {background: #0c1220; color: #dbe5ff;}')
+        self.css.load_from_data(b'.zaper {background: #141b2b; color: #edf2ff;} .zaper .title {font-size: 24px; font-weight: bold;} .zaper button {padding: 7px 10px;} .zaper combobox button {padding: 2px 10px;} .zaper textview text {background: #0c1220; color: #dbe5ff;}')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def later(self, milliseconds, callback, repeat=False):
@@ -172,7 +172,7 @@ class App:
         return row
 
     def settings_page(self):
-        page = self.page('Настройки'); grid = Gtk.Grid(column_spacing=16, row_spacing=10)
+        page = self.page('Настройки'); grid = Gtk.Grid(column_spacing=16, row_spacing=8)
         self.game = Choice(('off', 'tcp', 'udp', 'all'))
         self.ipset = Choice(('none', 'loaded', 'any'))
         self.strategy = Choice(STRATEGIES)
@@ -186,7 +186,7 @@ class App:
         page.pack_start(grid, False, False, 0)
         self.auto_check = Flag('Проверять сеть после сохранения')
         self.faceit_exclusions = Flag('Исключать выбранные серверы FACEIT из UDP', True)
-        page.pack_start(self.auto_check, False, False, 0); page.pack_start(self.faceit_exclusions, False, False, 0)
+        self.row(page, self.auto_check, self.faceit_exclusions)
         page.pack_start(label('Игровой режим работает при IPSet loaded/any. Применение сохраняет прежнее состояние службы; ошибка возвращает настройки.'), False, False, 0)
         self.row(page, self.button('Сохранить и проверить', self.save), self.button('Исключения доменов / IP / UID', self.exclusions))
         self.row(page, self.button('Настройки запуска и трея', self.launch_dialog))

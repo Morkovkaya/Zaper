@@ -16,18 +16,18 @@
 
 ### Task 1: GTK frontend
 Files: linux/zapret_gui.py, tests/gui_smoke.py.
-- [ ] Preserve five tabs, settings/fakes/exclusions, profiles/history, tuning/proxy, diagnostics/chart, maintenance/Hosts/updater and launch preferences.
-- [ ] Use native GTK file dialogs and transient dialogs, responsive workers, progress and safe busy/close behavior. Clear token widgets on close.
-- [ ] Exercise every dialog/page and callback under X11 and native Wayland; ensure no UI exceptions or lost controls after closing dialogs.
+- [x] Preserve five tabs, settings/fakes/exclusions, profiles/history, tuning/proxy, diagnostics/chart, maintenance/Hosts/updater and launch preferences.
+- [x] Use native GTK file dialogs and transient dialogs, responsive workers, progress and safe busy/close behavior. Clear token widgets on close.
+- [x] Exercise every dialog/page and callback under X11 and native Wayland; ensure no UI exceptions or lost controls after closing dialogs.
 
 ### Task 2: Tray
 Files: linux/zaper_tray.py, tests/status_notifier_fixture.py, tests/gui_smoke.py.
-- [ ] Use a native Gio D-Bus StatusNotifierItem with a verified StatusNotifierWatcher/host; optional embedded Gtk.StatusIcon on X11 only.
-- [ ] Check startup/hide/show/close/exit, unavailable host, host disappearance and action delivery through the real D-Bus interface.
-- [ ] Preserve per-user panel autostart/start-in-tray preferences and error notifications.
+- [x] Use a native Gio D-Bus StatusNotifierItem with a verified StatusNotifierWatcher/host; optional embedded Gtk.StatusIcon on X11 only.
+- [x] Check startup/hide/show/close/exit, unavailable host, host disappearance and action delivery through the real D-Bus interface.
+- [x] Preserve per-user panel autostart/start-in-tray preferences and error notifications.
 
 ### Task 3: Native Wayland verification and delivery
 Files: scripts/test-wayland.sh, workflow, README, version, validation.
-- [ ] Test with headless Weston, GDK_BACKEND=wayland and DISPLAY unset; test scale factors 1 and 2, native dialogs and tray protocol.
-- [ ] Run all backend/packet/ARM64/migration and Windows regression checks; inspect GTK layout screenshots under X11.
-- [ ] Publish Linux 3.8.1-linux.3 from verified main CI, merge PR after checks, compare downloaded release with the CI artifact and retain proof in outputs.
+- [x] Test with headless Weston, GDK_BACKEND=wayland and DISPLAY unset; test scale factors 1 and 2, native dialogs and tray protocol.
+- [x] Run all backend/packet/ARM64/migration and Windows regression checks; inspect GTK layout screenshots under X11.
+- [x] Publish Linux 3.8.1-linux.3 from verified main CI, merge PR after checks, compare downloaded release with the CI artifact and retain proof in outputs.
