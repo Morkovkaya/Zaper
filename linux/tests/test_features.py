@@ -115,7 +115,8 @@ class PersistenceTests(unittest.TestCase):
         preferences.save(prefs, self.root)
         self.assertEqual(preferences.load(self.root), prefs)
         launch = self.root / 'autostart/zaper.desktop'
-        self.assertIn('zapret2-manager-gui --tray', launch.read_text())
+        self.assertIn('Exec=/usr/local/bin/zapret2-manager-gui\n', launch.read_text())
+        self.assertNotIn('--tray', launch.read_text())
         with patch.object(zm, 'service') as service:
             preferences.save(preferences.Preferences(), self.root)
             preferences.save(preferences.Preferences(), self.root)
