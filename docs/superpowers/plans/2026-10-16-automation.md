@@ -44,5 +44,5 @@
 ### Task 4: End-to-end delivery
 **Files:** README.md, linux/README.md, docs/VALIDATION.md, workflow.
 - [x] Document the dependency installer, one-click update and version-triggered automatic releases.
-- [ ] Run all packaged tests and full CI (Windows, X11, Wayland, ARM64, real engine, old upgrades); fix any failures.
-- [ ] Open and attach PR, merge after checks, observe main publishing Linux.4 automatically and verify public download SHA256.
+- [x] Run all packaged tests and full CI (Windows, X11, Wayland, ARM64, real engine, old upgrades); fix any failures.
+- [x] Open and attach PR, merge after checks, observe main publishing Linux.4 automatically and verify public download SHA256.
