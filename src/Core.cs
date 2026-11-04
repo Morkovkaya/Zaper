@@ -45,6 +45,15 @@ public static class Core {
  public static T Read<T>(string path) { return new JavaScriptSerializer { MaxJsonLength=10000000 }.Deserialize<T>(ReadShared(path)); }
  public static void Write(string path,object value) { string tmp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{File.WriteAllText(tmp,new JavaScriptSerializer {MaxJsonLength=10000000}.Serialize(value),new UTF8Encoding(false));for(int n=0;;n++){try{if(File.Exists(path))File.Replace(tmp,path,null);else File.Move(tmp,path);return;}catch(IOException){if(n>=5)throw;Thread.Sleep(20*(n+1));}}}finally{if(File.Exists(tmp))try{File.Delete(tmp);}catch{}} }
  public static Settings Load() { return File.Exists(PathOf("manager-settings.json"))?Read<Settings>(PathOf("manager-settings.json")):new Settings(); }
+ public static string EnsureBlobs(string text) {
+  foreach(var blob in new[]{"tls_google|tls_clienthello_www_google_com.bin","tls_4pda|tls_clienthello_4pda_to.bin","stun|stun.bin"}) {
+   string name=blob.Split('|')[0],file=blob.Split('|')[1];
+   bool used=text.Contains("blob="+name+":")||text.Contains("seqovl_pattern="+name)||text.Contains("pattern="+name);
+   bool declared=Regex.IsMatch(text,@"(?m)^--blob="+Regex.Escape(name)+":");
+   if(used&&!declared)text="--blob="+name+":"+Quote(PathOf("files\\"+file))+"\r\n"+text;
+  }
+  return text;
+ }
  public static void Guard() { if(File.Exists(PathOf("autotune-pending.json"))) throw new InvalidOperationException("Не завершён автоподбор. Сначала восстановите предыдущую стратегию."); }
  public static string State() { using(var s=new ServiceController(Service)) { try{return s.Status.ToString();}catch{return "NotInstalled";} } }
  public static async Task<CommandResult> Run(string exe,string args,CancellationToken token,int timeout=15000,string extraPath=null,string workingDirectory=null) {
@@ -80,7 +89,7 @@ public static class Core {
    text=Regex.Replace(text,@"(?m)(--filter-udp=1024-65535[^\r\n]*)(\r?\n)--lua-desync=fake:blob=quic_google:repeats=5:payload=all\r?\n--lua-desync=fake:blob=game_udp:repeats=5:payload=all",m=>m.Groups[1].Value.Replace("--out-range=-n4","--out-range=<n4").Replace("--payload=all","--filter-l7=unknown --payload=unknown")+m.Groups[2].Value+"--lua-desync=fake:blob=faceit_legacy_udp:repeats=10:payload=unknown");
   }
   string face=PathOf("files\\faceit-game-exclude.txt");if(s.FaceitServerExclusions&&File.Exists(face)&&File.ReadAllLines(face).Any(l=>Regex.IsMatch(l,@"^\d+\.")))text=Regex.Replace(text,@"(?m)(--filter-udp=[^\r\n]*)",m=>m.Value+" --ipset-exclude="+Quote(face));
-  return text;
+  return EnsureBlobs(text);
  }
  public static async Task Validate(string text,CancellationToken token) {
   string f=PathOf("native-check-"+Guid.NewGuid().ToString("N")+".txt");File.WriteAllText(f,"--dry-run\r\n--wf-dup-check=0\r\n"+text,Encoding.ASCII);

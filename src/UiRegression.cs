@@ -12,8 +12,9 @@ public static class UiRegression {
   string directory=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"tests");Directory.CreateDirectory(directory);var report=new List<string>();int failures=0;
   Action<bool,string> check=(ok,name)=>{report.Add((ok?"PASS: ":"FAIL: ")+name);if(!ok)failures++;};
   var form=new MainForm();form.Shown+=async(s,e)=>{try{
-   check(form.Text=="Zaper 3.8.1","short zaper window title");
+   check(form.Text=="Zaper 3.8.2","short zaper window title");
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Настроить FACEIT")||b.Text=="График задержки"),"no duplicate FACEIT shortcut or separate graph launcher");
+   var strategyChoice=All(form).OfType<ComboBox>().FirstOrDefault(c=>c.Items.Contains("Fake TLS Auto (оригинальный)"));var savedStrategy=Network.Find(Core.Load().StrategyId);check(strategyChoice!=null&&strategyChoice.Items.Count==Network.Candidates().Length&&Network.Candidates().Any(c=>c.Id=="split-568-4pda"),"manual strategy selector lists all original zapret strategies");check(strategyChoice!=null&&savedStrategy!=null&&Equals(strategyChoice.SelectedItem,savedStrategy.Name),"saved strategy is selected in manual selector");check(All(form).OfType<Button>().Any(b=>b.Text=="Применить"&&b.Visible),"manual strategy has an apply action");
    check(All(form).OfType<LatencyPanel>().Count()==1,"graph embedded directly in diagnostics");
    check(await form.NetworkGraph.TestLocal(),"embedded diagnostics graph plots real loopback samples");
    check(await ParallelDownload(),"UI stays responsive while direct download cancels stalled proxy route");
@@ -28,7 +29,7 @@ public static class UiRegression {
    using(var graph=new LatencyForm()){bool passed=await graph.TestLocal();File.WriteAllText(Path.Combine(directory,"graph-test.txt"),(passed?"PASS":"FAIL")+": loopback ping samples plotted, counter updates, graph disposal");check(passed,"live graph loopback samples");}
    string root=Core.Root;string fixture=Path.Combine(directory,"startup-fixture");Directory.CreateDirectory(fixture);
    try{Core.Root=fixture;Core.Write(Core.PathOf("ui-preferences.json"),new UiPreferences {StartInTray=true});Program.TestStartupPreferences=true;using(var hidden=new MainForm()){hidden.Show();Application.DoEvents();check(hidden.StartedHidden,"saved StartInTray preference suppresses initial window");check(hidden.TestTray(),"initially hidden window restores and closes to tray");hidden.ExitApp();}Program.TestStartupPreferences=false;}finally{Core.Root=root;Program.TestStartupPreferences=false;}
-   bool tray=form.TestTray();File.WriteAllText(Path.Combine(directory,"tray-test.txt"),(tray?"PASS":"FAIL")+": status/menu states, operation lock, minimize/cross hide and restore");check(tray,"tray lifecycle");
+   bool tray=form.TestTray();File.WriteAllText(Path.Combine(directory,"tray-test.txt"),(tray?"PASS":"FAIL")+": status/menu states, operation lock, minimize stays in taskbar, close hides to tray, and restore");check(tray,"tray lifecycle");
    Tests.Preview(form);Tests.PreviewExclusions();check(File.ReadAllText(Path.Combine(directory,"layout-test.txt")).Contains("Failures: 0"),"all pages fit default and minimum sizes");
   }catch(Exception ex){check(false,ex.ToString());}finally{form.ExitApp();check(form.IsDisposed&&form.TrayReleased,"explicit exit closes form and removes tray icon");File.AppendAllText(Path.Combine(directory,"tray-test.txt"),Environment.NewLine+(form.IsDisposed&&form.TrayReleased?"PASS":"FAIL")+": explicit exit closes form and removes tray icon");report.Add("Failures: "+failures);File.WriteAllLines(Path.Combine(directory,"ui-test.txt"),report);}};
   Application.Run(form);return Task.FromResult(failures==0?0:1);

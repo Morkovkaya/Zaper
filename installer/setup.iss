@@ -4,7 +4,7 @@ AppId={code:InstallerAppId}
 AppName=Zaper
 ; Keep installer recognition compatible with the 3.7/3.8 update dialogs.
 VersionInfoProductName=Zapret 2 Manager
-AppVersion=3.8.1
+AppVersion=3.8.2
 AppPublisher=Zapret 2 Manager Community
 DefaultDirName={commonappdata}\zapret2
 DisableDirPage=yes
@@ -21,7 +21,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0
 OutputDir=..\dist
-OutputBaseFilename=Zapret2Manager-Setup-3.8.1-x64
+OutputBaseFilename=Zapret2Manager-Setup-3.8.2-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
