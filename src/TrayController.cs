@@ -32,7 +32,7 @@ public sealed class TrayController:IDisposable {
   Refresh("Running",false);bool started=!on.Enabled&&off.Enabled&&restart.Enabled&&tray.Visible;
   Refresh("Stopped",false);bool stopped=on.Enabled&&!off.Enabled&&!restart.Enabled;
   Refresh("Running",true);bool locked=!on.Enabled&&!off.Enabled&&!restart.Enabled;
-  owner.WindowState=FormWindowState.Minimized;Application.DoEvents();bool minimized=owner.Visible&&owner.ShowInTaskbar&&owner.WindowState==FormWindowState.Minimized&&tray.Visible;
+  Open();Application.DoEvents();owner.WindowState=FormWindowState.Minimized;Application.DoEvents();bool minimized=owner.Visible&&owner.ShowInTaskbar&&owner.WindowState==FormWindowState.Minimized&&tray.Visible;
   Open();Application.DoEvents();bool restoredWindow=owner.Visible&&owner.WindowState!=FormWindowState.Minimized;
   owner.Close();Application.DoEvents();bool closeHidden=!owner.IsDisposed&&!owner.Visible&&tray.Visible;
   Open();Application.DoEvents();return started&&stopped&&locked&&minimized&&restoredWindow&&closeHidden&&owner.Visible;
