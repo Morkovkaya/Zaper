@@ -9,6 +9,7 @@ public static class Package {
  public static async Task TestService(){string[] files={"manager-base.txt","config.txt","manager-settings.json"};byte[][] old=new byte[files.Length][];for(int i=0;i<files.Length;i++)old[i]=File.ReadAllBytes(Core.PathOf(files[i]));string service=Core.Service;Core.Service="zapret2-installer-test";try{if(Core.State()!="NotInstalled")throw new Exception("Тестовая служба уже существует");File.WriteAllText(Core.PathOf("manager-base.txt"),"--wf-tcp-out=1\r\n--filter-tcp=1\r\n",System.Text.Encoding.ASCII);Core.Write(Core.PathOf("manager-settings.json"),new Settings {Game="off",IPSet="none",AutoStart=false});await Core.Install(CancellationToken.None);Core.Control("Restart");await Core.Remove(CancellationToken.None);File.WriteAllText(Core.PathOf("package-service-test.txt"),"PASS: packaged engine service create/start/restart/remove, isolated TCP port 1\r\n");}finally{if(Core.State()!="NotInstalled")awaitRemove();Core.Service=service;for(int i=0;i<files.Length;i++)File.WriteAllBytes(Core.PathOf(files[i]),old[i]);}}
  static void awaitRemove(){Core.Remove(CancellationToken.None).GetAwaiter().GetResult();}
  public static async Task Configure(){
+  Core.Guard();
   Core.Preflight();
   string template=Core.PathOf("manager-base.template");
   if(!File.Exists(Core.PathOf("manager-base.txt")))File.WriteAllText(Core.PathOf("manager-base.txt"),File.ReadAllText(template).Replace("%ROOT%",Core.Root),System.Text.Encoding.ASCII);

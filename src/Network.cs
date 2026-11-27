@@ -66,13 +66,25 @@ public static class Network {
  }
  public static Task Tune(CancellationToken token,Action<int,string> progress) {return Task.Run(()=>{using(var mutex=new Mutex(false,@"Global\Zapret2AutoTune")){bool owned=false;try{try{owned=mutex.WaitOne(0);}catch(AbandonedMutexException){owned=true;}if(!owned)throw new Exception("Подбор уже работает");TuneOwned(token,progress).GetAwaiter().GetResult();}finally{if(owned)mutex.ReleaseMutex();}}});}
  static async Task TuneOwned(CancellationToken token,Action<int,string> progress) {
-  Core.Guard();var backup=Core.Backup();Core.Write(Core.PathOf("native-tune-pending.json"),backup);File.WriteAllText(Core.PathOf("autotune-pending.json"),"{\"Native\":true}");File.WriteAllText(Core.PathOf("native-last-backup.txt"),backup.Directory);
+  Core.Guard();var backup=Core.Backup();Core.Write(Core.PathOf("native-tune-pending.json"),backup);File.WriteAllText(Core.PathOf("native-last-backup.txt"),backup.Directory);Core.Write(Core.PathOf("autotune-pending.json"),new {Native=true});
    bool safe=false;try {string original=File.ReadAllText(Path.Combine(backup.Directory,"manager-base.txt"));var settings=Core.Load();var candidates=Candidates();var measured=new List<Candidate>();
     for(int i=0;i<candidates.Length;i++){token.ThrowIfCancellationRequested();var c=candidates[i];progress(i*85/candidates.Length,"Стратегия "+(i+1)+"/"+candidates.Length+": "+c.Name);try{await Core.Apply(settings,token,TuneBase(original,c),true);if(Core.State()!="Running")Core.Control("On");await Task.Delay(1000,token);c.Measurement=await Measure(2,token);measured.Add(c);progress((i+1)*85/candidates.Length,c.Name+": "+c.Measurement.Good+"/"+c.Measurement.Samples.Count+", P90 "+c.Measurement.P90.ToString("0.000")+" с");}catch(OperationCanceledException){throw;}catch(Exception e){c.Error=e.Message;measured.Add(c);progress((i+1)*85/candidates.Length,c.Name+": "+e.Message);}Core.Write(Core.PathOf("native-autotune-results.json"),measured);}
     var best=Winner(measured);if(best==null)throw new Exception("Ни одна стратегия не прошла обязательные проверки");progress(90,"Повторная проверка финалистов");var finalists=measured.Where(c=>c.Id=="current"||c==best).ToArray();foreach(var c in finalists){await Core.Apply(settings,token,TuneBase(original,c),true);if(Core.State()!="Running")Core.Control("On");c.Measurement=await Measure(3,token);}best=Winner(finalists);if(best==null)throw new Exception("Повторная проверка не пройдена");settings.StrategyId=best.Id;settings.StrategyName=best.Name;await Core.Apply(settings,token,TuneBase(original,best),true);if(backup.State!="Running")Core.Control("Off");using(var key=Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+Core.Service,true)){key.SetValue("Start",backup.Start);}Core.Write(Core.PathOf("native-autotune-results.json"),measured);progress(100,"Выбрана стратегия: "+best.Name);safe=true;
    }catch{Core.Restore(backup);safe=true;throw;}finally{if(safe){File.Delete(Core.PathOf("autotune-pending.json"));File.Delete(Core.PathOf("native-tune-pending.json"));}}
  }
- public static void Recover(){using(var mutex=new Mutex(false,@"Global\Zapret2AutoTune")){bool own=false;try{try{own=mutex.WaitOne(0);}catch(AbandonedMutexException){own=true;}if(!own)throw new Exception("Подбор ещё работает");string f=Core.PathOf("native-last-backup.txt");if(!File.Exists(f))throw new Exception("Резервная копия приложения отсутствует");var snap=Core.Read<Snapshot>(Path.Combine(File.ReadAllText(f).Trim(),"native-manifest.json"));Core.Restore(snap);File.Delete(Core.PathOf("autotune-pending.json"));File.Delete(Core.PathOf("native-tune-pending.json"));}finally{if(own)mutex.ReleaseMutex();}}}
+ public static void Recover(){Recover(false);}
+ public static void RecoverInterrupted(){Recover(true);}
+ static void Recover(bool pendingOnly){
+  using(var mutex=new Mutex(false,@"Global\Zapret2AutoTune")){bool own=false;try{
+   try{own=mutex.WaitOne(0);}catch(AbandonedMutexException){own=true;}
+   if(!own)throw new Exception("Автоподбор ещё работает. Дождитесь его завершения и повторите операцию.");
+   string journal=Core.PathOf("autotune-pending.json");if(pendingOnly&&!File.Exists(journal))return;
+   string snapshotFile=Core.PathOf("native-tune-pending.json");Snapshot snap;
+   if(File.Exists(snapshotFile))snap=Core.Read<Snapshot>(snapshotFile);
+   else{string pointer=Core.PathOf("native-last-backup.txt");if(!File.Exists(pointer))throw new Exception("Не найдена копия для восстановления после прерванного автоподбора.");snap=Core.Read<Snapshot>(Path.Combine(File.ReadAllText(pointer).Trim(),"native-manifest.json"));}
+   Core.Restore(snap);if(File.Exists(journal))File.Delete(journal);if(File.Exists(snapshotFile))File.Delete(snapshotFile);
+  }finally{if(own)mutex.ReleaseMutex();}}
+ }
  public static IPEndPoint ParseServer(string value){string v=Regex.Replace(value.Trim(),@"^connect\s+","");Match m=Regex.Match(v,@"^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$");IPAddress ip;int port;if(!m.Success||!IPAddress.TryParse(m.Groups[1].Value,out ip)||!int.TryParse(m.Groups[2].Value,out port)||port<1||port>65535)throw new Exception("Введите IPv4:порт сервера матча");return new IPEndPoint(ip,port);}
  public static async Task<List<FaceRow>> Faceit(string server,CancellationToken token) {
   string[] names={"Финляндия","Германия","Швеция","Нидерланды","Франция","Великобритания","Москва","Казахстан"};string[] ids={"finland","germany","sweden","netherlands","france","uk","moscow","kazakhstan"};

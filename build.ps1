@@ -47,4 +47,4 @@ if(!$SkipInstaller){
  if($LASTEXITCODE){throw 'Installer compilation failed'}
 }
 Write-Output "Application: $app\Zapret2Manager.exe"
-if(!$SkipInstaller){Write-Output "Installer: $root\dist\Zapret2Manager-Setup-3.8.1-x64.exe"}
+if(!$SkipInstaller){Write-Output "Installer: $root\dist\Zapret2Manager-Setup-3.8.3-x64.exe"}

@@ -1,8 +1,12 @@
 # Zaper
 
-Приложение для Windows 10/11 x64. Версия **3.8.1**. Нативный [Linux-порт](linux/README.md): **3.8.1-linux.4**, x86_64/ARM64, нативные Wayland/X11.
+Приложение для Windows 10/11 x64. Версия **3.8.3**. Нативный [Linux-порт](linux/README.md): **3.8.1-linux.4**, x86_64/ARM64, нативные Wayland/X11.
 
 Управление службой winws2, профилями TCP/UDP, исключениями приложений, диагностикой FACEIT и автоподбором стратегии.
+
+## Изменения 3.8.3 для Windows
+
+- При запуске приложения и перед установкой прерванный автоподбор автоматически откатывается к сохранённой конфигурации. Если подбор ещё работает, операция сообщает об этом и не меняет активную конфигурацию.
 
 ## Изменения 3.8.2 для Windows
 
@@ -61,7 +65,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SkipInstaller
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -InnoCompiler "C:\Program Files (x86)\Inno Setup 7\ISCC.exe"
 ```
 
-Результат: `dist/Zapret2Manager-Setup-3.8.1-x64.exe`. Сборка не устанавливает приложение и не меняет службы.
+Результат: `dist/Zapret2Manager-Setup-3.8.3-x64.exe`. Сборка не устанавливает приложение и не меняет службы.
 
 ## Проверки
 
