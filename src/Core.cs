@@ -45,7 +45,7 @@ public static class Core {
  public static T Read<T>(string path) { return new JavaScriptSerializer { MaxJsonLength=10000000 }.Deserialize<T>(ReadShared(path)); }
  public static void Write(string path,object value) { string tmp=path+"."+Guid.NewGuid().ToString("N")+".tmp";try{File.WriteAllText(tmp,new JavaScriptSerializer {MaxJsonLength=10000000}.Serialize(value),new UTF8Encoding(false));for(int n=0;;n++){try{if(File.Exists(path))File.Replace(tmp,path,null);else File.Move(tmp,path);return;}catch(IOException){if(n>=5)throw;Thread.Sleep(20*(n+1));}}}finally{if(File.Exists(tmp))try{File.Delete(tmp);}catch{}} }
  public static Settings Load() { return File.Exists(PathOf("manager-settings.json"))?Read<Settings>(PathOf("manager-settings.json")):new Settings(); }
- public static void Guard() { if(File.Exists(PathOf("autotune-pending.json"))) throw new InvalidOperationException("Не завершён автоподбор. Сначала восстановите предыдущую стратегию."); }
+ public static void Guard() { if(File.Exists(PathOf("autotune-pending.json"))) Network.RecoverInterrupted(); }
  public static string State() { using(var s=new ServiceController(Service)) { try{return s.Status.ToString();}catch{return "NotInstalled";} } }
  public static async Task<CommandResult> Run(string exe,string args,CancellationToken token,int timeout=15000,string extraPath=null,string workingDirectory=null) {
   var pi=new ProcessStartInfo(exe,args) { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };

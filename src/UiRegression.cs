@@ -12,7 +12,7 @@ public static class UiRegression {
   string directory=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"tests");Directory.CreateDirectory(directory);var report=new List<string>();int failures=0;
   Action<bool,string> check=(ok,name)=>{report.Add((ok?"PASS: ":"FAIL: ")+name);if(!ok)failures++;};
   var form=new MainForm();form.Shown+=async(s,e)=>{try{
-   check(form.Text=="Zaper 3.8.1","short zaper window title");
+   check(form.Text=="Zaper 3.8.3","short zaper window title");
    check(!All(form).OfType<Button>().Any(b=>b.Text.Contains("Настроить FACEIT")||b.Text=="График задержки"),"no duplicate FACEIT shortcut or separate graph launcher");
    check(All(form).OfType<LatencyPanel>().Count()==1,"graph embedded directly in diagnostics");
    check(await form.NetworkGraph.TestLocal(),"embedded diagnostics graph plots real loopback samples");
